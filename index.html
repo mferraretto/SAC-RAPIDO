@@ -100,6 +100,42 @@
         </div>
       </form>
     </dialog>
+
+    <!-- Modal editar Pós-vendas -->
+    <dialog id="posCardDialog" class="dialog">
+      <form method="dialog" id="posCardForm" class="card">
+        <h3>Editar card Pós-vendas</h3>
+        <input type="hidden" id="posCardId">
+        <label>Seção
+          <select id="posCardSection" required>
+            <option value="top">Fluxo principal</option>
+            <option value="bottom">Opções de resolução</option>
+          </select>
+        </label>
+        <label>Visual
+          <select id="posCardVariant" required>
+            <option value="case">Caso</option>
+            <option value="option">Opção</option>
+          </select>
+        </label>
+        <label>Título
+          <input type="text" id="posCardTitle" required>
+        </label>
+        <label>Parágrafos (um por linha)
+          <textarea id="posCardParagraphs" rows="6" placeholder="Digite cada parágrafo em uma nova linha"></textarea>
+        </label>
+        <label>Lista com marcadores (um item por linha)
+          <textarea id="posCardBullets" rows="6" placeholder="Digite cada item em uma nova linha"></textarea>
+        </label>
+        <label>Nota final
+          <textarea id="posCardNote" rows="3" placeholder="Observação opcional"></textarea>
+        </label>
+        <div class="row right gap">
+          <button class="btn btn-ghost" value="cancel">Cancelar</button>
+          <button class="btn" value="default" type="submit">Salvar card</button>
+        </div>
+      </form>
+    </dialog>
   </main>
 
   <footer class="footer muted small">

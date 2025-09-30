@@ -1,7 +1,7 @@
 // App logic (modular Firebase v9 via CDN)
 import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-auth.js";
-import { getFirestore, collection, addDoc, getDocs, query, where, orderBy, serverTimestamp, updateDoc, doc, deleteDoc, limit } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
+import { getFirestore, collection, addDoc, getDocs, query, serverTimestamp, updateDoc, doc, deleteDoc, limit, writeBatch } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
 import { firebaseConfig } from "./firebase-config.js";
 
 const app = initializeApp(firebaseConfig);
@@ -32,10 +32,24 @@ const editCategory = document.getElementById('editCategory');
 const editQuestion = document.getElementById('editQuestion');
 const editAnswer = document.getElementById('editAnswer');
 
+const posCardDialog = document.getElementById('posCardDialog');
+const posCardForm = document.getElementById('posCardForm');
+const posCardId = document.getElementById('posCardId');
+const posCardSection = document.getElementById('posCardSection');
+const posCardVariant = document.getElementById('posCardVariant');
+const posCardTitle = document.getElementById('posCardTitle');
+const posCardParagraphs = document.getElementById('posCardParagraphs');
+const posCardBullets = document.getElementById('posCardBullets');
+const posCardNote = document.getElementById('posCardNote');
+
 let currentUser = null;
 let currentCategory = 'Todas';
 let categories = new Set();
 let lastSnapshot = [];
+let posCards = [];
+let posSeedEnsured = false;
+let draggingQaCard = null;
+let draggingPosCard = null;
 
 const POS_VENDAS_TAB_LABEL = 'Pós-vendas / Quebras';
 const posVendasContent = {
@@ -158,17 +172,46 @@ onAuthStateChanged(auth, async (user) => {
 
 // --- Firestore helpers ---
 const col = collection(db, 'faqs');
+const posCol = collection(db, 'posVendasCards');
 
-async function fetchAll(searchText = '') {
-  const qs = query(col, orderBy('category'), orderBy('question'));
-  const snap = await getDocs(qs);
+async function fetchAll() {
+  const snap = await getDocs(col);
   const items = [];
   snap.forEach(d => items.push({ id: d.id, ...d.data() }));
-  lastSnapshot = items;
+  lastSnapshot = items
+    .map(item => ({ ...item, orderIndex: typeof item.orderIndex === 'number' ? item.orderIndex : Number.MAX_SAFE_INTEGER }))
+    .sort((a, b) => {
+      const orderDiff = (a.orderIndex ?? Number.MAX_SAFE_INTEGER) - (b.orderIndex ?? Number.MAX_SAFE_INTEGER);
+      if (orderDiff !== 0) return orderDiff;
+      const catDiff = (a.category || '').localeCompare(b.category || '');
+      if (catDiff !== 0) return catDiff;
+      return (a.question || '').localeCompare(b.question || '');
+    });
   categories = new Set(items.map(i => i.category));
-  renderTabs();
-  renderCatDatalist();
-  renderList(searchText);
+}
+
+async function fetchPosCards() {
+  const snap = await getDocs(posCol);
+  if (snap.empty && !posSeedEnsured) {
+    await ensurePosSeed();
+    posSeedEnsured = true;
+    return fetchPosCards();
+  }
+  const items = [];
+  snap.forEach(d => items.push({ id: d.id, ...d.data() }));
+  posCards = items
+    .map(card => ({
+      ...card,
+      orderIndex: typeof card.orderIndex === 'number' ? card.orderIndex : Number.MAX_SAFE_INTEGER,
+      section: card.section || 'top'
+    }))
+    .sort((a, b) => {
+      const sectionDiff = (a.section || '').localeCompare(b.section || '');
+      if (sectionDiff !== 0) return sectionDiff;
+      const orderDiff = (a.orderIndex ?? Number.MAX_SAFE_INTEGER) - (b.orderIndex ?? Number.MAX_SAFE_INTEGER);
+      if (orderDiff !== 0) return orderDiff;
+      return (a.title || '').localeCompare(b.title || '');
+    });
 }
 
 function renderTabs() {
@@ -217,11 +260,13 @@ function renderList(searchText='') {
   }
 
   items.forEach(item => qaListEl.appendChild(renderItem(item)));
+  setupQaDragAndDrop();
 }
 
 function renderItem(item) {
   const wrap = document.createElement('article');
   wrap.className = 'qa';
+  wrap.dataset.id = item.id;
 
   const head = document.createElement('div');
   head.className = 'qa-head';
@@ -304,29 +349,49 @@ function renderPosVendas() {
 
   const topRow = document.createElement('div');
   topRow.className = 'pos-vendas-row';
-  posVendasContent.top.forEach(card => topRow.appendChild(createPosCard(card)));
+  topRow.dataset.section = 'top';
+
+  const bottomRow = document.createElement('div');
+  bottomRow.className = 'pos-vendas-row pos-vendas-row--options';
+  bottomRow.dataset.section = 'bottom';
+
+  const topCards = posCards.filter(card => (card.section || 'top') === 'top');
+  const bottomCards = posCards.filter(card => (card.section || 'top') === 'bottom');
+
+  if (!topCards.length && !bottomCards.length) {
+    const empty = document.createElement('div');
+    empty.className = 'card muted';
+    empty.textContent = 'Nenhum card cadastrado para Pós-vendas / Quebras.';
+    qaListEl.appendChild(empty);
+    return;
+  }
+
+  topCards.forEach(card => topRow.appendChild(createPosCard(card)));
 
   const flow = document.createElement('div');
   flow.className = 'pos-vendas-flow';
-  posVendasContent.top.forEach(() => {
+  topCards.forEach(() => {
     const icon = document.createElement('span');
     icon.className = 'material-symbols-rounded';
     icon.textContent = 'arrow_downward';
     flow.appendChild(icon);
   });
 
-  const bottomRow = document.createElement('div');
-  bottomRow.className = 'pos-vendas-row pos-vendas-row--options';
-  posVendasContent.bottom.forEach(card => bottomRow.appendChild(createPosCard(card)));
+  bottomCards.forEach(card => bottomRow.appendChild(createPosCard(card)));
 
   qaListEl.appendChild(topRow);
-  qaListEl.appendChild(flow);
+  if (topCards.length && bottomCards.length) {
+    qaListEl.appendChild(flow);
+  }
   qaListEl.appendChild(bottomRow);
+
+  setupPosDragAndDrop(topRow, bottomRow);
 }
 
 function createPosCard(card) {
   const article = document.createElement('article');
   article.className = 'pos-card' + (card.variant ? ` pos-card--${card.variant}` : '');
+  article.dataset.id = card.id;
 
   const head = document.createElement('div');
   head.className = 'pos-card__head';
@@ -352,7 +417,19 @@ function createPosCard(card) {
   btnCopy.className = 'btn btn-ghost btn-icon';
   btnCopy.innerHTML = '<span class="material-symbols-rounded">content_copy</span><span>Copiar</span>';
 
+  const btnEdit = document.createElement('button');
+  btnEdit.className = 'btn btn-secondary';
+  btnEdit.textContent = 'Editar';
+  btnEdit.addEventListener('click', () => openPosEdit(card));
+
+  const btnDelete = document.createElement('button');
+  btnDelete.className = 'btn btn-danger';
+  btnDelete.textContent = 'Excluir';
+  btnDelete.addEventListener('click', () => deletePosCard(card));
+
   actions.appendChild(btnCopy);
+  actions.appendChild(btnEdit);
+  actions.appendChild(btnDelete);
 
   head.appendChild(info);
   head.appendChild(actions);
@@ -420,6 +497,221 @@ function createPosCard(card) {
   return article;
 }
 
+function setupQaDragAndDrop() {
+  if (qaListEl.classList.contains('pos-vendas-mode')) return;
+  const cards = Array.from(qaListEl.querySelectorAll('.qa'));
+  if (!cards.length) return;
+  cards.forEach(card => {
+    card.setAttribute('draggable', 'true');
+    card.addEventListener('dragstart', onQaDragStart);
+    card.addEventListener('dragend', onQaDragEnd);
+  });
+}
+
+function onQaDragStart(event) {
+  draggingQaCard = event.currentTarget;
+  draggingQaCard.classList.add('dragging');
+  event.dataTransfer.effectAllowed = 'move';
+}
+
+function onQaDragEnd() {
+  if (!draggingQaCard) return;
+  draggingQaCard.classList.remove('dragging');
+  draggingQaCard = null;
+}
+
+qaListEl.addEventListener('dragover', (event) => {
+  if (!draggingQaCard) return;
+  event.preventDefault();
+  const afterElement = getDragAfterElement(qaListEl, event.clientY, '.qa');
+  if (!afterElement) {
+    qaListEl.appendChild(draggingQaCard);
+  } else if (afterElement !== draggingQaCard) {
+    qaListEl.insertBefore(draggingQaCard, afterElement);
+  }
+});
+
+qaListEl.addEventListener('drop', async (event) => {
+  if (!draggingQaCard) return;
+  event.preventDefault();
+  const ids = Array.from(qaListEl.querySelectorAll('.qa')).map(el => el.dataset.id);
+  draggingQaCard.classList.remove('dragging');
+  draggingQaCard = null;
+  await persistQaOrder(ids);
+});
+
+function getDragAfterElement(container, y, selector) {
+  const elements = [...container.querySelectorAll(`${selector}:not(.dragging)`)];
+  return elements.reduce((closest, child) => {
+    const box = child.getBoundingClientRect();
+    const offset = y - box.top - box.height / 2;
+    if (offset < 0 && offset > closest.offset) {
+      return { offset, element: child };
+    }
+    return closest;
+  }, { offset: Number.NEGATIVE_INFINITY, element: null }).element;
+}
+
+async function persistQaOrder(ids) {
+  if (!ids.length) return;
+  const batch = writeBatch(db);
+  ids.forEach((id, index) => {
+    const ref = doc(db, 'faqs', id);
+    batch.update(ref, {
+      orderIndex: index,
+      updatedAt: serverTimestamp()
+    });
+  });
+  await batch.commit();
+  await reload();
+}
+
+function setupPosDragAndDrop(topRow, bottomRow) {
+  const rows = [topRow, bottomRow];
+  rows.forEach(row => {
+    row.querySelectorAll('.pos-card').forEach(card => {
+      card.setAttribute('draggable', 'true');
+      card.addEventListener('dragstart', onPosDragStart);
+      card.addEventListener('dragend', onPosDragEnd);
+    });
+    row.addEventListener('dragover', (event) => onPosDragOver(event, row));
+    row.addEventListener('drop', (event) => onPosDrop(event, rows));
+  });
+}
+
+function onPosDragStart(event) {
+  draggingPosCard = event.currentTarget;
+  draggingPosCard.classList.add('dragging');
+  event.dataTransfer.effectAllowed = 'move';
+}
+
+function onPosDragEnd() {
+  if (!draggingPosCard) return;
+  draggingPosCard.classList.remove('dragging');
+  draggingPosCard = null;
+}
+
+function onPosDragOver(event, row) {
+  if (!draggingPosCard) return;
+  event.preventDefault();
+  const afterElement = getDragAfterElement(row, event.clientY, '.pos-card');
+  if (!afterElement) {
+    row.appendChild(draggingPosCard);
+  } else if (afterElement !== draggingPosCard) {
+    row.insertBefore(draggingPosCard, afterElement);
+  }
+}
+
+async function onPosDrop(event, rows) {
+  if (!draggingPosCard) return;
+  event.preventDefault();
+  const targetRow = event.currentTarget;
+  if (draggingPosCard.parentElement !== targetRow) {
+    targetRow.appendChild(draggingPosCard);
+  }
+  draggingPosCard.classList.remove('dragging');
+  const order = rows.reduce((acc, row) => {
+    const section = row.dataset.section || 'top';
+    acc[section] = Array.from(row.querySelectorAll('.pos-card')).map(el => el.dataset.id);
+    return acc;
+  }, {});
+  draggingPosCard = null;
+  await persistPosOrder(order);
+}
+
+async function persistPosOrder(order) {
+  const batch = writeBatch(db);
+  Object.entries(order).forEach(([section, ids]) => {
+    ids.forEach((id, index) => {
+      const ref = doc(db, 'posVendasCards', id);
+      batch.update(ref, {
+        section,
+        orderIndex: index,
+        updatedAt: serverTimestamp()
+      });
+    });
+  });
+  await batch.commit();
+  await reload();
+}
+
+function openPosEdit(card) {
+  posCardId.value = card.id;
+  posCardSection.value = card.section || 'top';
+  posCardVariant.value = card.variant || 'case';
+  posCardTitle.value = card.title || '';
+  posCardParagraphs.value = (card.paragraphs || []).join('\n');
+  posCardBullets.value = (card.bullets || []).join('\n');
+  posCardNote.value = card.note || '';
+  posCardDialog.showModal();
+}
+
+async function deletePosCard(card) {
+  if (!confirm('Excluir este card de Pós-vendas?')) return;
+  await deleteDoc(doc(db, 'posVendasCards', card.id));
+  await reload();
+}
+
+function toList(value) {
+  return value
+    .split('\n')
+    .map(line => line.trim())
+    .filter(Boolean);
+}
+
+posCardForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const id = posCardId.value;
+  if (!id) return;
+  const ref = doc(db, 'posVendasCards', id);
+  await updateDoc(ref, {
+    section: posCardSection.value || 'top',
+    variant: posCardVariant.value || 'case',
+    title: posCardTitle.value.trim(),
+    paragraphs: toList(posCardParagraphs.value),
+    bullets: toList(posCardBullets.value),
+    note: posCardNote.value.trim(),
+    updatedAt: serverTimestamp()
+  });
+  posCardDialog.close();
+  await reload();
+});
+
+posCardDialog?.addEventListener('close', () => {
+  posCardForm.reset();
+  posCardId.value = '';
+});
+
+async function ensurePosSeed() {
+  const snap = await getDocs(query(posCol, limit(1)));
+  if(!snap.empty) return;
+  const batch = writeBatch(db);
+  posVendasContent.top.forEach((card, index) => {
+    const ref = doc(posCol);
+    batch.set(ref, {
+      ...card,
+      section: 'top',
+      orderIndex: index,
+      createdBy: currentUser?.uid || null,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    });
+  });
+  posVendasContent.bottom.forEach((card, index) => {
+    const ref = doc(posCol);
+    batch.set(ref, {
+      ...card,
+      section: 'bottom',
+      orderIndex: index,
+      createdBy: currentUser?.uid || null,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    });
+  });
+  await batch.commit();
+  posSeedEnsured = true;
+}
+
 // --- Actions ---
 btnReload.addEventListener('click', reload);
 btnClear.addEventListener('click', () => { searchInput.value=''; renderList(''); });
@@ -434,6 +726,7 @@ newForm.addEventListener('submit', async (e) => {
     createdBy: currentUser?.uid || null,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
+    orderIndex: lastSnapshot.length
   };
   if(!payload.question || !payload.answer) return alert('Preencha pergunta e resposta.');
   await addDoc(col, payload);
@@ -491,10 +784,17 @@ async function ensureSeed() {
       updatedAt: serverTimestamp(),
     });
   }
+  await ensurePosSeed();
   alert('Base carregada com sucesso.');
   await reload();
 }
 
 async function reload() {
-  await fetchAll(searchInput.value.trim());
+  await Promise.all([
+    fetchAll(),
+    fetchPosCards()
+  ]);
+  renderTabs();
+  renderCatDatalist();
+  renderList(searchInput.value.trim());
 }
