@@ -37,6 +37,82 @@ let currentCategory = 'Todas';
 let categories = new Set();
 let lastSnapshot = [];
 
+const POS_VENDAS_TAB_LABEL = 'Pós-vendas / Quebras';
+const posVendasContent = {
+  top: [
+    {
+      variant: 'case',
+      title: 'Reclamação — quebrado, sem foto',
+      paragraphs: [
+        'Oi, espero que esteja bem. Sinto muito por isso! Para que eu possa te ajudar da melhor forma, você poderia me enviar uma foto do item?',
+        'Assim consigo entender melhor o que aconteceu e buscar a melhor solução para você.'
+      ]
+    },
+    {
+      variant: 'case',
+      title: 'Reclamação — cilindro quebrado — com foto',
+      paragraphs: [
+        'Oi! Sentimos muito pelo ocorrido. Podemos resolver de três formas:'
+      ],
+      bullets: [
+        'Reembolso parcial — você fica com o produto e recebe parte do valor de volta.',
+        'Devolução pelo app da Shopee — reembolso total após o retorno.',
+        'Envio de nova peça — sem custo pela peça; você paga apenas o frete e não precisa devolver nada.'
+      ],
+      note: 'Me avisa qual opção prefere que resolvo tudo por aqui.'
+    },
+    {
+      variant: 'case',
+      title: 'Reclamação — arco quebrado — com foto',
+      paragraphs: [
+        'Tudo bem? Peço mil desculpas pelo ocorrido! Posso te enviar novas peças para repor as que chegaram quebradas. Pode ser?'
+      ]
+    }
+  ],
+  bottom: [
+    {
+      variant: 'option',
+      title: 'OPÇÃO 1 — Reembolso parcial (como solicitar)',
+      paragraphs: [
+        'Para solicitar o reembolso parcial, siga este passo a passo no app:'
+      ],
+      bullets: [
+        "Acesse 'Minhas Compras' na guia 'Eu'.",
+        'Selecione o pedido e toque em "Devolver/Reembolsar".',
+        "Escolha 'Reembolso parcial' e adicione fotos e a descrição do problema."
+      ],
+      note: 'Qualquer dúvida, estamos aqui para ajudar.'
+    },
+    {
+      variant: 'option',
+      title: 'OPÇÃO 2 — Devolução total (pelo app da Shopee)',
+      paragraphs: [
+        'As devoluções, trocas e reembolsos acontecem pelo app da Shopee. Faça assim:'
+      ],
+      bullets: [
+        "Vá em 'Eu' > 'Minhas Compras' e selecione o pedido.",
+        "Toque em 'Pedido de reembolso'.",
+        'Escolha o motivo e anexe as evidências (fotos/vídeos).',
+        "Finalize tocando em 'Enviar'."
+      ],
+      note: 'Depois de enviar, acompanhe pelo app. Estamos por aqui para qualquer dúvida.'
+    },
+    {
+      variant: 'option',
+      title: 'OPÇÃO 3 — Envio de nova peça (sem devolver o item)',
+      paragraphs: [
+        'Para receber uma nova peça sem precisar devolver nada, é só comprar o anúncio simbólico que envio para você.',
+        'Ele custa R$2,00 apenas para gerar a etiqueta e você ainda pode usar cupom de frete grátis.'
+      ],
+      bullets: [
+        'Complete a compra do link simbólico para liberar o envio.',
+        'Acompanhe o rastreio direto pelo pedido na Shopee.'
+      ],
+      note: 'Assim você recebe rapidinho a peça nova, de forma prática e segura.'
+    }
+  ]
+};
+
 // --- Auth ---
 document.getElementById('authForm').addEventListener('submit', async (e) => {
   e.preventDefault();
@@ -106,6 +182,7 @@ function renderTabs() {
   };
   tabsEl.appendChild(makeTab('Todas'));
   Array.from(categories).sort().forEach(cat => tabsEl.appendChild(makeTab(cat)));
+  tabsEl.appendChild(makeTab(POS_VENDAS_TAB_LABEL));
 }
 
 function renderCatDatalist() {
@@ -118,6 +195,12 @@ function renderCatDatalist() {
 }
 
 function renderList(searchText='') {
+  qaListEl.classList.remove('pos-vendas-mode');
+  qaListEl.innerHTML = '';
+  if(currentCategory === POS_VENDAS_TAB_LABEL) {
+    renderPosVendas();
+    return;
+  }
   const filter = (item) => {
     const byCat = (currentCategory === 'Todas' || item.category === currentCategory);
     const bySearch = !searchText || (item.question.toLowerCase().includes(searchText.toLowerCase()) || item.answer.toLowerCase().includes(searchText.toLowerCase()));
@@ -125,7 +208,6 @@ function renderList(searchText='') {
   };
 
   const items = lastSnapshot.filter(filter);
-  qaListEl.innerHTML = '';
   if(items.length === 0) {
     const empty = document.createElement('div');
     empty.className = 'card muted';
@@ -215,6 +297,127 @@ function renderItem(item) {
   wrap.appendChild(head);
   wrap.appendChild(body);
   return wrap;
+}
+
+function renderPosVendas() {
+  qaListEl.classList.add('pos-vendas-mode');
+
+  const topRow = document.createElement('div');
+  topRow.className = 'pos-vendas-row';
+  posVendasContent.top.forEach(card => topRow.appendChild(createPosCard(card)));
+
+  const flow = document.createElement('div');
+  flow.className = 'pos-vendas-flow';
+  posVendasContent.top.forEach(() => {
+    const icon = document.createElement('span');
+    icon.className = 'material-symbols-rounded';
+    icon.textContent = 'arrow_downward';
+    flow.appendChild(icon);
+  });
+
+  const bottomRow = document.createElement('div');
+  bottomRow.className = 'pos-vendas-row pos-vendas-row--options';
+  posVendasContent.bottom.forEach(card => bottomRow.appendChild(createPosCard(card)));
+
+  qaListEl.appendChild(topRow);
+  qaListEl.appendChild(flow);
+  qaListEl.appendChild(bottomRow);
+}
+
+function createPosCard(card) {
+  const article = document.createElement('article');
+  article.className = 'pos-card' + (card.variant ? ` pos-card--${card.variant}` : '');
+
+  const head = document.createElement('div');
+  head.className = 'pos-card__head';
+
+  const info = document.createElement('div');
+  info.className = 'pos-card__info';
+
+  const chip = document.createElement('span');
+  chip.className = 'pos-card__chip';
+  chip.textContent = 'PÓS-VENDAS • Quebras';
+
+  const title = document.createElement('h4');
+  title.className = 'pos-card__title';
+  title.textContent = card.title;
+
+  info.appendChild(chip);
+  info.appendChild(title);
+
+  const actions = document.createElement('div');
+  actions.className = 'pos-card__actions';
+
+  const btnCopy = document.createElement('button');
+  btnCopy.className = 'btn btn-ghost btn-icon';
+  btnCopy.innerHTML = '<span class="material-symbols-rounded">content_copy</span><span>Copiar</span>';
+
+  actions.appendChild(btnCopy);
+
+  head.appendChild(info);
+  head.appendChild(actions);
+
+  const body = document.createElement('div');
+  body.className = 'pos-card__body';
+
+  (card.paragraphs || []).forEach(text => {
+    const p = document.createElement('p');
+    p.textContent = text;
+    body.appendChild(p);
+  });
+
+  if(card.bullets && card.bullets.length) {
+    const ul = document.createElement('ul');
+    ul.className = 'pos-card__list';
+    card.bullets.forEach(item => {
+      const li = document.createElement('li');
+      li.textContent = item;
+      ul.appendChild(li);
+    });
+    body.appendChild(ul);
+  }
+
+  if(card.note) {
+    const note = document.createElement('p');
+    note.className = 'pos-card__note';
+    note.textContent = card.note;
+    body.appendChild(note);
+  }
+
+  const feedback = document.createElement('div');
+  feedback.className = 'copy-feedback';
+  feedback.style.display = 'none';
+  feedback.innerHTML = '<span class="material-symbols-rounded">check</span><span>Conteúdo copiado</span>';
+
+  body.appendChild(feedback);
+
+  const copyLines = [
+    chip.textContent,
+    card.title,
+    ...(card.paragraphs || []),
+    ...(card.bullets || []),
+    card.note || null
+  ].filter(Boolean);
+
+  btnCopy.addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(copyLines.join('\n'));
+      btnCopy.innerHTML = '<span class="material-symbols-rounded">done</span><span>Copiado</span>';
+      feedback.style.display = 'flex';
+      setTimeout(() => {
+        btnCopy.innerHTML = '<span class="material-symbols-rounded">content_copy</span><span>Copiar</span>';
+        feedback.style.display = 'none';
+      }, 2000);
+    } catch(err) {
+      alert('Não foi possível copiar o conteúdo automaticamente.');
+      console.error(err);
+    }
+  });
+
+  article.appendChild(head);
+  article.appendChild(body);
+
+  return article;
 }
 
 // --- Actions ---
