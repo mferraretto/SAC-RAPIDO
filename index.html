@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>SAC – Central de Perguntas e Respostas</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+  <header class="app-header">
+    <div class="logo">SAC</div>
+    <nav class="auth-nav">
+      <span id="userEmail" class="muted"></span>
+      <button id="btnLogout" class="btn btn-ghost" style="display:none">Sair</button>
+    </nav>
+  </header>
+
+  <main class="container">
+    <!-- Login / Registro -->
+    <section id="authSection" class="card auth-card">
+      <h2>Acessar</h2>
+      <form id="authForm">
+        <label>E-mail
+          <input type="email" id="email" required placeholder="voce@exemplo.com"/>
+        </label>
+        <label>Senha
+          <input type="password" id="password" required placeholder="********"/>
+        </label>
+        <div class="row gap">
+          <button type="submit" id="btnLogin" class="btn">Entrar</button>
+          <button type="button" id="btnRegister" class="btn btn-secondary">Criar conta</button>
+        </div>
+      </form>
+      <p class="muted small">Login com Firebase (Email/Senha).</p>
+    </section>
+
+    <!-- App -->
+    <section id="appSection" style="display:none;">
+      <div class="toolbar card">
+        <div class="row between">
+          <div class="row gap">
+            <button id="btnSeed" class="btn btn-secondary" title="Carrega a base inicial se sua coleção estiver vazia">Carregar base (seed)</button>
+            <button id="btnReload" class="btn btn-ghost">Recarregar</button>
+          </div>
+          <div class="row gap">
+            <input id="searchInput" class="input" type="search" placeholder="Buscar por pergunta/resposta...">
+            <button id="btnClear" class="btn btn-ghost" title="Limpar busca">Limpar</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Abas (categorias) -->
+      <div id="tabs" class="tabs"></div>
+
+      <!-- Lista de Q&A -->
+      <div id="qaList" class="qa-list"></div>
+
+      <!-- Novo Q&A -->
+      <div class="card">
+        <h3>Novo Q&A</h3>
+        <form id="newForm" class="grid-2">
+          <label>Categoria
+            <input type="text" id="newCategory" list="catList" placeholder="Ex.: Entrega & Prazo" required>
+            <datalist id="catList"></datalist>
+          </label>
+          <label>Pergunta / Enunciado
+            <input type="text" id="newQuestion" placeholder="Digite a pergunta..." required>
+          </label>
+          <label class="grid-span-2">Resposta
+            <textarea id="newAnswer" rows="6" placeholder="Cole a resposta exata aqui..." required></textarea>
+          </label>
+          <div class="grid-span-2 right">
+            <button class="btn" type="submit">Salvar</button>
+          </div>
+        </form>
+      </div>
+    </section>
+
+    <!-- Modal editar -->
+    <dialog id="editDialog" class="dialog">
+      <form method="dialog" id="editForm" class="card">
+        <h3>Editar Q&A</h3>
+        <input type="hidden" id="editId">
+        <label>Categoria
+          <input type="text" id="editCategory" required>
+        </label>
+        <label>Pergunta / Enunciado
+          <input type="text" id="editQuestion" required>
+        </label>
+        <label>Resposta
+          <textarea id="editAnswer" rows="8" required></textarea>
+        </label>
+        <div class="row right gap">
+          <button class="btn btn-ghost" value="cancel">Cancelar</button>
+          <button class="btn" value="default" id="btnSaveEdit">Salvar</button>
+        </div>
+      </form>
+    </dialog>
+  </main>
+
+  <footer class="footer muted small">
+    <span>SAC • Firebase Firestore • © 2025</span>
+  </footer>
+
+  <script type="module" src="firebase-config.js"></script>
+  <script type="module" src="app.js"></script>
+</body>
+</html>
