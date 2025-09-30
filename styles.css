@@ -141,9 +141,6 @@ input::placeholder, textarea::placeholder { color: #94a3b8; }
   grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
   gap: 18px;
 }
-.qa-list.post-sales-active {
-  display: block;
-}
 .qa {
   border:1px solid var(--border);
   border-radius: 22px;
@@ -206,56 +203,6 @@ input::placeholder, textarea::placeholder { color: #94a3b8; }
   gap: 6px;
   font-size: 13px;
   color: var(--muted);
-}
-
-.post-sales-grid {
-  display: flex;
-  flex-direction: column;
-  gap: 28px;
-}
-
-.post-sales-row {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: 18px;
-}
-
-.post-sales-card {
-  border: 1px solid var(--border);
-  border-radius: 22px;
-  background: var(--card);
-  padding: 20px 22px;
-  box-shadow: 0 18px 36px -28px rgba(15, 23, 42, 0.4);
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.post-sales-card-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.post-sales-card-head h4 {
-  margin: 0;
-  font-size: 18px;
-  color: var(--txt);
-  line-height: 1.4;
-}
-
-.post-sales-card-body {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.post-sales-card-body p {
-  margin: 0;
-  color: var(--txt-soft);
-  line-height: 1.6;
-  white-space: pre-line;
 }
 
 .muted { color: var(--muted); }
