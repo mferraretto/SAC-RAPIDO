@@ -138,32 +138,79 @@ function renderList(searchText='') {
 }
 
 function renderItem(item) {
-  const wrap = document.createElement('div');
+  const wrap = document.createElement('article');
   wrap.className = 'qa';
 
   const head = document.createElement('div');
   head.className = 'qa-head';
-  const ttl = document.createElement('div');
-  ttl.className = 'qa-title';
-  ttl.textContent = `[${item.category}] ${item.question}`;
+
+  const info = document.createElement('div');
+  info.className = 'qa-info';
+
+  const chip = document.createElement('span');
+  chip.className = 'qa-chip';
+  chip.textContent = item.category || 'Sem categoria';
+
+  const question = document.createElement('h4');
+  question.className = 'qa-question';
+  question.textContent = item.question;
+
+  info.appendChild(chip);
+  info.appendChild(question);
+
   const actions = document.createElement('div');
   actions.className = 'qa-actions';
+
+  const btnCopy = document.createElement('button');
+  btnCopy.className = 'btn btn-ghost btn-icon';
+  btnCopy.innerHTML = '<span class="material-symbols-rounded">content_copy</span><span>Copiar</span>';
+
   const btnEdit = document.createElement('button');
   btnEdit.className = 'btn btn-secondary';
   btnEdit.textContent = 'Editar';
   btnEdit.addEventListener('click', () => openEdit(item));
+
   const btnDel = document.createElement('button');
   btnDel.className = 'btn btn-danger';
   btnDel.textContent = 'Excluir';
   btnDel.addEventListener('click', () => onDelete(item));
+
+  actions.appendChild(btnCopy);
   actions.appendChild(btnEdit);
   actions.appendChild(btnDel);
-  head.appendChild(ttl);
+
+  head.appendChild(info);
   head.appendChild(actions);
 
   const body = document.createElement('div');
   body.className = 'qa-body';
-  body.textContent = item.answer;
+
+  const answer = document.createElement('p');
+  answer.className = 'qa-answer';
+  answer.textContent = item.answer;
+
+  const feedback = document.createElement('div');
+  feedback.className = 'copy-feedback';
+  feedback.style.display = 'none';
+  feedback.innerHTML = '<span class="material-symbols-rounded">check</span><span>Resposta copiada</span>';
+
+  body.appendChild(answer);
+  body.appendChild(feedback);
+
+  btnCopy.addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(item.answer);
+      btnCopy.innerHTML = '<span class="material-symbols-rounded">done</span><span>Copiado</span>';
+      feedback.style.display = 'flex';
+      setTimeout(() => {
+        btnCopy.innerHTML = '<span class="material-symbols-rounded">content_copy</span><span>Copiar</span>';
+        feedback.style.display = 'none';
+      }, 2000);
+    } catch (err) {
+      alert('Não foi possível copiar a resposta automaticamente.');
+      console.error(err);
+    }
+  });
 
   wrap.appendChild(head);
   wrap.appendChild(body);
