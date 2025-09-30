@@ -8,6 +8,8 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
+const POST_SALES_CATEGORY = 'Pós-vendas / Quebras';
+
 const authSection = document.getElementById('authSection');
 const appSection = document.getElementById('appSection');
 const userEmailSpan = document.getElementById('userEmail');
@@ -36,6 +38,61 @@ let currentUser = null;
 let currentCategory = 'Todas';
 let categories = new Set();
 let lastSnapshot = [];
+
+const postSalesLayout = {
+  top: [
+    {
+      title: 'Reclamação — quebrado, sem foto',
+      paragraphs: [
+        'Oi, espero que esteja bem. Sinto muito por isso!',
+        'Pelo seu relato parece que a peça chegou com a embalagem danificada, confere?',
+        'Assim consigo te direcionar melhor para resolver e encontramos a melhor solução para você.'
+      ],
+    },
+    {
+      title: 'Reclamação cilindro quebrado — com foto',
+      paragraphs: [
+        'Obrigada por compartilhar, que constrangimento.',
+        'Podemos resolver isso juntos! Pode me enviar fotos do produto?',
+        'Assim agilizamos com a loja e encontramos a solução mais rápida pra você.'
+      ],
+    },
+    {
+      title: 'Reclamação arco quebrado — com foto',
+      paragraphs: [
+        'Obrigada por nos avisar! Vi que mencionou fotos, pode me mandar por aqui?',
+        'Assim eu abro o protocolo com a loja rapidinho para te ajudar, combinado?'
+      ],
+    }
+  ],
+  bottom: [
+    {
+      title: 'OPÇÃO 1 — Reembolso parcial (como solicitar)',
+      paragraphs: [
+        'Reembolso integral: devolvemos o valor pago na mesma forma de pagamento.',
+        'Enviamos o Termo de Responsabilidade Parcial e abrimos o processo em até 3 dias úteis.'
+      ],
+    },
+    {
+      title: 'Devoluções, parcial (como solicitar)',
+      paragraphs: [
+        'É só mandar a peça de volta pelos Correios:',
+        '1. Embale a peça e leve até a agência mais próxima;',
+        '2. Informe este código na hora de postar: XXXXX-XXXXX;',
+        '3. Guarde o comprovante e me envia. Assim que chegar, devolvemos o valor.'
+      ],
+    },
+    {
+      title: 'OPÇÃO 3 — Troca sem peça',
+      paragraphs: [
+        'Peça nova a caminho! Envio uma nova peça pra você, mesmo modelo e tamanho, sem custo.',
+        'Sem necessidade de devolução: pode ficar com a peça atual.',
+        'Assim que embarcar, te envio o código de rastreio. Alguém precisa acompanhar para receber, tudo bem?',
+        'Qualquer dúvida me chama.'
+      ],
+    }
+  ]
+};
 
 // --- Auth ---
 document.getElementById('authForm').addEventListener('submit', async (e) => {
@@ -105,7 +162,11 @@ function renderTabs() {
     return b;
   };
   tabsEl.appendChild(makeTab('Todas'));
-  Array.from(categories).sort().forEach(cat => tabsEl.appendChild(makeTab(cat)));
+  tabsEl.appendChild(makeTab(POST_SALES_CATEGORY));
+  Array.from(categories).sort().forEach(cat => {
+    if(cat === POST_SALES_CATEGORY) return;
+    tabsEl.appendChild(makeTab(cat));
+  });
 }
 
 function renderCatDatalist() {
@@ -118,6 +179,13 @@ function renderCatDatalist() {
 }
 
 function renderList(searchText='') {
+  if(currentCategory === POST_SALES_CATEGORY) {
+    qaListEl.classList.add('post-sales-active');
+    renderPostSales();
+    return;
+  }
+
+  qaListEl.classList.remove('post-sales-active');
   const filter = (item) => {
     const byCat = (currentCategory === 'Todas' || item.category === currentCategory);
     const bySearch = !searchText || (item.question.toLowerCase().includes(searchText.toLowerCase()) || item.answer.toLowerCase().includes(searchText.toLowerCase()));
@@ -135,6 +203,79 @@ function renderList(searchText='') {
   }
 
   items.forEach(item => qaListEl.appendChild(renderItem(item)));
+}
+
+function renderPostSales() {
+  qaListEl.innerHTML = '';
+  const grid = document.createElement('div');
+  grid.className = 'post-sales-grid';
+
+  const makeRow = (cards, extraClass) => {
+    const row = document.createElement('div');
+    row.className = 'post-sales-row' + (extraClass ? ' ' + extraClass : '');
+    cards.forEach(card => row.appendChild(createPostSalesCard(card)));
+    return row;
+  };
+
+  grid.appendChild(makeRow(postSalesLayout.top, 'top'));
+  grid.appendChild(makeRow(postSalesLayout.bottom, 'bottom'));
+
+  qaListEl.appendChild(grid);
+}
+
+function createPostSalesCard(card) {
+  const article = document.createElement('article');
+  article.className = 'post-sales-card';
+
+  const head = document.createElement('div');
+  head.className = 'post-sales-card-head';
+
+  const title = document.createElement('h4');
+  title.textContent = card.title;
+
+  const btnCopy = document.createElement('button');
+  btnCopy.className = 'btn btn-ghost btn-icon';
+  btnCopy.innerHTML = '<span class="material-symbols-rounded">content_copy</span><span>Copiar</span>';
+
+  head.appendChild(title);
+  head.appendChild(btnCopy);
+
+  const body = document.createElement('div');
+  body.className = 'post-sales-card-body';
+
+  card.paragraphs.forEach(text => {
+    const p = document.createElement('p');
+    p.textContent = text;
+    body.appendChild(p);
+  });
+
+  const feedback = document.createElement('div');
+  feedback.className = 'copy-feedback';
+  feedback.style.display = 'none';
+  feedback.innerHTML = '<span class="material-symbols-rounded">check</span><span>Texto copiado</span>';
+
+  body.appendChild(feedback);
+
+  btnCopy.addEventListener('click', async () => {
+    try {
+      const value = card.paragraphs.join('\n\n');
+      await navigator.clipboard.writeText(value);
+      btnCopy.innerHTML = '<span class="material-symbols-rounded">done</span><span>Copiado</span>';
+      feedback.style.display = 'flex';
+      setTimeout(() => {
+        btnCopy.innerHTML = '<span class="material-symbols-rounded">content_copy</span><span>Copiar</span>';
+        feedback.style.display = 'none';
+      }, 2000);
+    } catch(err) {
+      alert('Não foi possível copiar o texto automaticamente.');
+      console.error(err);
+    }
+  });
+
+  article.appendChild(head);
+  article.appendChild(body);
+
+  return article;
 }
 
 function renderItem(item) {
