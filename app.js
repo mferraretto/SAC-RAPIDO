@@ -469,10 +469,8 @@ function createPosCard(card) {
   body.appendChild(feedback);
 
   const copyLines = [
-    chip.textContent,
-    card.title,
     ...(card.paragraphs || []),
-    ...(card.bullets || []),
+    ...((card.bullets || []).map(item => `• ${item}`)),
     card.note || null
   ].filter(Boolean);
 
