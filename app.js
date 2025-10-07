@@ -325,8 +325,13 @@ function renderItem(item) {
   body.appendChild(feedback);
 
   btnCopy.addEventListener('click', async () => {
+    const answerText = (answer.textContent || '').trim();
+    if (!answerText) {
+      alert('Não há resposta para copiar.');
+      return;
+    }
     try {
-      await navigator.clipboard.writeText(item.answer);
+      await navigator.clipboard.writeText(answerText);
       btnCopy.innerHTML = '<span class="material-symbols-rounded">done</span><span>Copiado</span>';
       feedback.style.display = 'flex';
       setTimeout(() => {
@@ -469,14 +474,16 @@ function createPosCard(card) {
   body.appendChild(feedback);
 
   const copyLines = [
-    chip.textContent,
-    card.title,
     ...(card.paragraphs || []),
     ...(card.bullets || []),
     card.note || null
-  ].filter(Boolean);
+  ].map(text => (text || '').trim()).filter(Boolean);
 
   btnCopy.addEventListener('click', async () => {
+    if (!copyLines.length) {
+      alert('Não há conteúdo de resposta para copiar.');
+      return;
+    }
     try {
       await navigator.clipboard.writeText(copyLines.join('\n'));
       btnCopy.innerHTML = '<span class="material-symbols-rounded">done</span><span>Copiado</span>';
