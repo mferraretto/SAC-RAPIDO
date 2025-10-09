@@ -475,7 +475,7 @@ function createPosCard(card) {
 
   const copyLines = [
     ...(card.paragraphs || []),
-    ...(card.bullets || []),
+    ...((card.bullets || []).map(item => `• ${item}`)),
     card.note || null
   ].map(text => (text || '').trim()).filter(Boolean);
 
