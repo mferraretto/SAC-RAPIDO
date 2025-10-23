@@ -20,8 +20,6 @@ const btnClear = document.getElementById('btnClear');
 const btnReload = document.getElementById('btnReload');
 const btnSeed = document.getElementById('btnSeed');
 const searchTools = document.getElementById('searchTools');
-const btnInstallPwa = document.getElementById('btnInstallPwa');
-const btnFocusNew = document.getElementById('btnFocusNew');
 
 const faqSection = document.getElementById('faqSection');
 const tipsSection = document.getElementById('tipsSection');
@@ -62,20 +60,8 @@ const posCardParagraphs = document.getElementById('posCardParagraphs');
 const posCardBullets = document.getElementById('posCardBullets');
 const posCardNote = document.getElementById('posCardNote');
 
-const DEFAULT_CATEGORY = 'Todos';
-const CATEGORY_PRESETS = [
-  { name: 'RECLAMAÇÕES ML', className: 'tab-ml' },
-  { name: 'MEDIAÇÕES ML', className: 'tab-ml-secondary' },
-  { name: 'REGRAS & DICAS ML', className: 'tab-ml' },
-  { name: 'RECLAMAÇÕES SHOPEE', className: 'tab-shopee' },
-  { name: 'MEDIAÇÕES SHOPEE', className: 'tab-shopee-secondary' },
-  { name: 'FRETE E ENTREGA SHOPEE', className: 'tab-shopee' },
-  { name: 'FRETE E ENTREGA ML', className: 'tab-shopee-secondary' },
-  { name: 'PRODUTOS E MEDIDAS', className: 'tab-neutral' }
-];
-
 let currentUser = null;
-let currentCategory = DEFAULT_CATEGORY;
+let currentCategory = 'Todas';
 let categories = new Set();
 let lastSnapshot = [];
 let posCards = [];
@@ -228,7 +214,7 @@ async function fetchAll() {
       if (catDiff !== 0) return catDiff;
       return (a.question || '').localeCompare(b.question || '');
     });
-  categories = new Set(items.map(i => i.category).filter(Boolean));
+  categories = new Set(items.map(i => i.category));
 }
 
 async function fetchPosCards() {
@@ -318,75 +304,28 @@ function toggleSearchTools(visible) {
 }
 
 function renderTabs() {
-  if (!tabsEl) return;
-  const styleMap = new Map(CATEGORY_PRESETS.map(cat => [cat.name, cat.className]));
-  styleMap.set(POS_VENDAS_TAB_LABEL, 'tab-pos');
-  styleMap.set(TIPS_TAB_LABEL, 'tab-tips');
-  styleMap.set(SUMMARY_TAB_LABEL, 'tab-summary');
-
-  const appendOrder = [];
-  const appended = new Set();
-
-  const append = (name) => {
-    if (!name || appended.has(name)) return;
-    appendOrder.push(name);
-    appended.add(name);
-  };
-
-  append(DEFAULT_CATEGORY);
-  CATEGORY_PRESETS.forEach(cat => append(cat.name));
-
-  const ignoredForDynamic = new Set([
-    DEFAULT_CATEGORY,
-    POS_VENDAS_TAB_LABEL,
-    TIPS_TAB_LABEL,
-    SUMMARY_TAB_LABEL,
-    ...CATEGORY_PRESETS.map(cat => cat.name)
-  ]);
-
-  Array.from(categories)
-    .filter(cat => cat && !ignoredForDynamic.has(cat))
-    .sort((a, b) => a.localeCompare(b))
-    .forEach(append);
-
-  append(POS_VENDAS_TAB_LABEL);
-  append(TIPS_TAB_LABEL);
-  append(SUMMARY_TAB_LABEL);
-
   tabsEl.innerHTML = '';
-  appendOrder.forEach(name => {
-    const extraClass = styleMap.get(name) || '';
-    const button = document.createElement('button');
-    button.className = `tab${extraClass ? ` ${extraClass}` : ''}${name === currentCategory ? ' active' : ''}`;
-    button.textContent = name;
-    button.addEventListener('click', () => {
-      currentCategory = name;
-      const searchValue = searchInput?.value?.trim?.() ?? '';
-      renderTabs();
-      renderList(searchValue);
-    });
-    tabsEl.appendChild(button);
-  });
+  const makeTab = (name) => {
+    const b = document.createElement('button');
+    b.className = 'tab' + (name === currentCategory ? ' active' : '');
+    b.textContent = name;
+    b.addEventListener('click', () => { currentCategory = name; renderList(searchInput.value.trim()); });
+    return b;
+  };
+  tabsEl.appendChild(makeTab('Todas'));
+  Array.from(categories).sort().forEach(cat => tabsEl.appendChild(makeTab(cat)));
+  tabsEl.appendChild(makeTab(POS_VENDAS_TAB_LABEL));
+  tabsEl.appendChild(makeTab(TIPS_TAB_LABEL));
+  tabsEl.appendChild(makeTab(SUMMARY_TAB_LABEL));
 }
 
 function renderCatDatalist() {
-  if (!catListDatalist) return;
   catListDatalist.innerHTML = '';
-  const values = new Set([
-    ...CATEGORY_PRESETS.map(cat => cat.name),
-    ...Array.from(categories)
-  ]);
-  values.delete(POS_VENDAS_TAB_LABEL);
-  values.delete(TIPS_TAB_LABEL);
-  values.delete(SUMMARY_TAB_LABEL);
-  Array.from(values)
-    .filter(Boolean)
-    .sort((a, b) => a.localeCompare(b))
-    .forEach(cat => {
-      const opt = document.createElement('option');
-      opt.value = cat;
-      catListDatalist.appendChild(opt);
-    });
+  Array.from(categories).sort().forEach(cat => {
+    const opt = document.createElement('option');
+    opt.value = cat;
+    catListDatalist.appendChild(opt);
+  });
 }
 
 function renderList(searchText='') {
@@ -415,13 +354,9 @@ function renderList(searchText='') {
     return;
   }
 
-  const normalizedSearch = searchText ? searchText.toLowerCase() : '';
   const filter = (item) => {
-    const byCat = (currentCategory === DEFAULT_CATEGORY || item.category === currentCategory);
-    if (!normalizedSearch) return byCat;
-    const question = item.question?.toLowerCase?.() ?? '';
-    const answer = item.answer?.toLowerCase?.() ?? '';
-    const bySearch = question.includes(normalizedSearch) || answer.includes(normalizedSearch);
+    const byCat = (currentCategory === 'Todas' || item.category === currentCategory);
+    const bySearch = !searchText || (item.question.toLowerCase().includes(searchText.toLowerCase()) || item.answer.toLowerCase().includes(searchText.toLowerCase()));
     return byCat && bySearch;
   };
 
@@ -1120,29 +1055,9 @@ async function ensurePosSeed() {
 }
 
 // --- Actions ---
-btnReload?.addEventListener('click', reload);
-btnClear?.addEventListener('click', () => {
-  if (searchInput) searchInput.value = '';
-  renderList('');
-});
-searchInput?.addEventListener('input', (e) => renderList(e.target.value.trim()));
-
-btnFocusNew?.addEventListener('click', () => {
-  const searchValue = searchInput?.value?.trim?.() ?? '';
-  if (currentCategory !== DEFAULT_CATEGORY) {
-    currentCategory = DEFAULT_CATEGORY;
-    renderTabs();
-    renderList(searchValue);
-  } else {
-    renderList(searchValue);
-  }
-  if (newQaCard) {
-    newQaCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }
-  if (newQuestion) {
-    newQuestion.focus();
-  }
-});
+btnReload.addEventListener('click', reload);
+btnClear.addEventListener('click', () => { searchInput.value=''; renderList(''); });
+searchInput.addEventListener('input', (e) => renderList(e.target.value.trim()));
 
 summaryDateFrom?.addEventListener('change', () => {
   if (currentCategory === SUMMARY_TAB_LABEL) renderSummary();
@@ -1305,6 +1220,5 @@ async function reload() {
   renderTabs();
   renderCatDatalist();
   renderTipCatDatalist();
-  const searchValue = searchInput?.value?.trim?.() ?? '';
-  renderList(searchValue);
+  renderList(searchInput.value.trim());
 }
