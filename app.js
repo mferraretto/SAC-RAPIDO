@@ -169,7 +169,7 @@ const STATIC_CATEGORY_LAYOUT = [
   { key: 'extra', categories: ['PRODUTOS E MEDIDAS', ALL_TAB_LABEL, SUMMARY_TAB_LABEL] }
 ];
 
-const SHOPEE_TAB_STYLE = {
+const ORANGE_TAB_STYLE = {
   bg: '#f97316',
   color: '#7c2d12',
   chipBg: '#ffedd5',
@@ -177,7 +177,7 @@ const SHOPEE_TAB_STYLE = {
   shadow: '0 18px 34px -20px rgba(249, 115, 22, 0.55)'
 };
 
-const ML_TAB_STYLE = {
+const GOLD_TAB_STYLE = {
   bg: '#facc15',
   color: '#713f12',
   chipBg: '#fef9c3',
@@ -186,13 +186,13 @@ const ML_TAB_STYLE = {
 };
 
 const CATEGORY_STYLE_MAP = new Map([
-  ['RECLAMAÇÕES ML', { ...ML_TAB_STYLE }],
-  ['MEDIAÇÕES ML', { ...ML_TAB_STYLE }],
-  ['REGRAS & DICAS ML', { ...ML_TAB_STYLE }],
-  ['RECLAMAÇÕES SHOPEE', { ...SHOPEE_TAB_STYLE }],
-  ['FRETE E ENTREGA SHOPEE', { ...SHOPEE_TAB_STYLE }],
-  ['MEDIAÇÕES SHOPEE', { ...SHOPEE_TAB_STYLE }],
-  ['REGRAS & DICAS SHOPEE', { ...SHOPEE_TAB_STYLE }],
+  ['RECLAMAÇÕES ML', { ...ORANGE_TAB_STYLE }],
+  ['MEDIAÇÕES ML', { ...ORANGE_TAB_STYLE }],
+  ['RECLAMAÇÕES SHOPEE', { ...ORANGE_TAB_STYLE }],
+  ['FRETE E ENTREGA SHOPEE', { ...ORANGE_TAB_STYLE }],
+  ['MEDIAÇÕES SHOPEE', { ...ORANGE_TAB_STYLE }],
+  ['REGRAS & DICAS ML', { ...GOLD_TAB_STYLE }],
+  ['REGRAS & DICAS SHOPEE', { ...GOLD_TAB_STYLE }],
   ['PRODUTOS E MEDIDAS', {
     bg: '#f8fafc',
     color: '#0f172a',
@@ -245,24 +245,7 @@ const RESERVED_CATEGORY_VALUES = new Set(
 );
 
 function getCategoryStyle(name) {
-  if (typeof name !== 'string') {
-    return null;
-  }
-
-  const registeredStyle = CATEGORY_STYLE_MAP.get(name);
-  if (registeredStyle) {
-    return registeredStyle;
-  }
-
-  const upperName = name.toUpperCase();
-  if (upperName.includes('ML')) {
-    return ML_TAB_STYLE;
-  }
-  if (upperName.includes('SHOPEE')) {
-    return SHOPEE_TAB_STYLE;
-  }
-
-  return null;
+  return CATEGORY_STYLE_MAP.get(name) || null;
 }
 
 function applyTabStyle(element, category) {
