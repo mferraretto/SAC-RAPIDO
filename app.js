@@ -21,7 +21,7 @@ const btnReload = document.getElementById('btnReload');
 const btnSeed = document.getElementById('btnSeed');
 const searchTools = document.getElementById('searchTools');
 const btnInstallPwa = document.getElementById('btnInstallPwa');
-const btnNewQa = document.getElementById('btnNewQa');
+const btnFocusNew = document.getElementById('btnFocusNew');
 
 const faqSection = document.getElementById('faqSection');
 const tipsSection = document.getElementById('tipsSection');
@@ -107,7 +107,6 @@ let allTimeLogStats = new Map();
 let posSeedEnsured = false;
 let draggingQaCard = null;
 let draggingPosCard = null;
-let deferredInstallPrompt = null;
 
 const DATE_TIME_FORMATTER = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
 const posVendasContent = {
@@ -1269,52 +1268,6 @@ document.getElementById('btnSaveEdit').addEventListener('click', async (e) => {
   });
   editDialog.close();
   await reload();
-});
-
-// --- PWA install ---
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').catch(err => {
-      console.error('Falha ao registrar o Service Worker', err);
-    });
-  });
-}
-
-window.addEventListener('beforeinstallprompt', (event) => {
-  event.preventDefault();
-  deferredInstallPrompt = event;
-  if (btnInstallPwa) {
-    btnInstallPwa.hidden = false;
-    btnInstallPwa.disabled = false;
-  }
-});
-
-btnInstallPwa?.addEventListener('click', async () => {
-  if (!deferredInstallPrompt) return;
-  btnInstallPwa.disabled = true;
-  try {
-    deferredInstallPrompt.prompt();
-    const choice = await deferredInstallPrompt.userChoice;
-    if (choice?.outcome === 'accepted') {
-      btnInstallPwa.hidden = true;
-    }
-  } catch (err) {
-    console.error('Não foi possível iniciar a instalação do app', err);
-  } finally {
-    deferredInstallPrompt = null;
-    if (btnInstallPwa) {
-      btnInstallPwa.disabled = false;
-      btnInstallPwa.hidden = true;
-    }
-  }
-});
-
-window.addEventListener('appinstalled', () => {
-  deferredInstallPrompt = null;
-  if (btnInstallPwa) {
-    btnInstallPwa.hidden = true;
-    btnInstallPwa.disabled = false;
-  }
 });
 
 // Seed exact user-provided content (only adds if collection is empty)
