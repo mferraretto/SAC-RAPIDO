@@ -20,6 +20,9 @@ const btnClear = document.getElementById('btnClear');
 const btnReload = document.getElementById('btnReload');
 const btnSeed = document.getElementById('btnSeed');
 const searchTools = document.getElementById('searchTools');
+const btnInstallPwa = document.getElementById('btnInstallPwa');
+const btnFocusNew = document.getElementById('btnFocusNew');
+const btnGoToNew = document.getElementById('btnGoToNew');
 
 const faqSection = document.getElementById('faqSection');
 const tipsSection = document.getElementById('tipsSection');
@@ -43,6 +46,22 @@ const newCategory = document.getElementById('newCategory');
 const newQuestion = document.getElementById('newQuestion');
 const newAnswer = document.getElementById('newAnswer');
 
+if (btnGoToNew) {
+  btnGoToNew.addEventListener('click', () => {
+    if (!newQaCard) return;
+    newQaCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    if (newCategory) {
+      setTimeout(() => {
+        try {
+          newCategory.focus({ preventScroll: true });
+        } catch (err) {
+          newCategory.focus();
+        }
+      }, 250);
+    }
+  });
+}
+
 const editDialog = document.getElementById('editDialog');
 const editForm = document.getElementById('editForm');
 const editId = document.getElementById('editId');
@@ -61,7 +80,9 @@ const posCardBullets = document.getElementById('posCardBullets');
 const posCardNote = document.getElementById('posCardNote');
 
 let currentUser = null;
-let currentCategory = 'Todas';
+const ALL_TAB_LABEL = 'TODOS';
+const SUMMARY_TAB_LABEL = 'RESUMO';
+let currentCategory = ALL_TAB_LABEL;
 let categories = new Set();
 let lastSnapshot = [];
 let posCards = [];
@@ -75,8 +96,129 @@ let draggingPosCard = null;
 
 const POS_VENDAS_TAB_LABEL = 'Pós-vendas / Quebras';
 const TIPS_TAB_LABEL = 'Dicas e Recomendações';
-const SUMMARY_TAB_LABEL = 'Resumo';
 const DATE_TIME_FORMATTER = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
+
+const STATIC_CATEGORY_LAYOUT = [
+  { key: 'ml', categories: ['RECLAMAÇÕES ML', 'MEDIAÇÕES ML', 'REGRAS & DICAS ML'] },
+  { key: 'shopee', categories: ['RECLAMAÇÕES SHOPEE', 'FRETE E ENTREGA SHOPEE', 'MEDIAÇÕES SHOPEE', 'REGRAS & DICAS SHOPEE'] },
+  { key: 'extra', categories: ['PRODUTOS E MEDIDAS', ALL_TAB_LABEL, SUMMARY_TAB_LABEL] }
+];
+
+const ORANGE_TAB_STYLE = {
+  bg: '#f97316',
+  color: '#7c2d12',
+  chipBg: '#ffedd5',
+  chipColor: '#9a3412',
+  shadow: '0 18px 34px -20px rgba(249, 115, 22, 0.55)'
+};
+
+const GOLD_TAB_STYLE = {
+  bg: '#facc15',
+  color: '#713f12',
+  chipBg: '#fef9c3',
+  chipColor: '#854d0e',
+  shadow: '0 18px 34px -20px rgba(202, 138, 4, 0.45)'
+};
+
+const CATEGORY_STYLE_MAP = new Map([
+  ['RECLAMAÇÕES ML', { ...ORANGE_TAB_STYLE }],
+  ['MEDIAÇÕES ML', { ...ORANGE_TAB_STYLE }],
+  ['RECLAMAÇÕES SHOPEE', { ...ORANGE_TAB_STYLE }],
+  ['FRETE E ENTREGA SHOPEE', { ...ORANGE_TAB_STYLE }],
+  ['MEDIAÇÕES SHOPEE', { ...ORANGE_TAB_STYLE }],
+  ['REGRAS & DICAS ML', { ...GOLD_TAB_STYLE }],
+  ['REGRAS & DICAS SHOPEE', { ...GOLD_TAB_STYLE }],
+  ['PRODUTOS E MEDIDAS', {
+    bg: '#f8fafc',
+    color: '#0f172a',
+    chipBg: '#f1f5f9',
+    chipColor: '#0f172a',
+    border: '#e2e8f0',
+    shadow: '0 18px 34px -20px rgba(148, 163, 184, 0.45)'
+  }],
+  [ALL_TAB_LABEL, {
+    bg: '#ffffff',
+    color: '#111827',
+    chipBg: '#e2e8f0',
+    chipColor: '#1f2937',
+    border: '#e2e8f0',
+    shadow: '0 18px 34px -20px rgba(100, 116, 139, 0.32)'
+  }],
+  [SUMMARY_TAB_LABEL, {
+    bg: '#ddd6fe',
+    color: '#5b21b6',
+    chipBg: '#ede9fe',
+    chipColor: '#5b21b6',
+    shadow: '0 18px 34px -20px rgba(109, 40, 217, 0.35)'
+  }],
+  [POS_VENDAS_TAB_LABEL, {
+    bg: '#c7d2fe',
+    color: '#1e3a8a',
+    chipBg: '#e0e7ff',
+    chipColor: '#312e81',
+    shadow: '0 18px 34px -20px rgba(79, 70, 229, 0.3)'
+  }],
+  [TIPS_TAB_LABEL, {
+    bg: '#bae6fd',
+    color: '#0369a1',
+    chipBg: '#e0f2fe',
+    chipColor: '#075985',
+    shadow: '0 18px 34px -20px rgba(14, 116, 144, 0.28)'
+  }],
+  ['Sem categoria', {
+    bg: '#e2e8f0',
+    color: '#1f2937',
+    chipBg: '#e2e8f0',
+    chipColor: '#1f2937',
+    border: '#cbd5f5',
+    shadow: '0 18px 34px -20px rgba(148, 163, 184, 0.3)'
+  }]
+]);
+
+const RESERVED_CATEGORY_VALUES = new Set(
+  [ALL_TAB_LABEL, SUMMARY_TAB_LABEL, POS_VENDAS_TAB_LABEL, TIPS_TAB_LABEL].map(label => label.toUpperCase())
+);
+
+function getCategoryStyle(name) {
+  return CATEGORY_STYLE_MAP.get(name) || null;
+}
+
+function applyTabStyle(element, category) {
+  if (!element) return;
+  const style = getCategoryStyle(category);
+  if (!style) {
+    element.style.removeProperty('--tab-bg');
+    element.style.removeProperty('--tab-color');
+    element.style.removeProperty('--tab-border');
+    element.style.removeProperty('--tab-shadow');
+    return;
+  }
+  if (style.bg) element.style.setProperty('--tab-bg', style.bg);
+  if (style.color) element.style.setProperty('--tab-color', style.color);
+  if (style.border) element.style.setProperty('--tab-border', style.border);
+  if (style.shadow) element.style.setProperty('--tab-shadow', style.shadow);
+}
+
+function applyChipStyle(element, category) {
+  if (!element) return;
+  const style = getCategoryStyle(category);
+  if (!style) {
+    element.style.removeProperty('--chip-bg');
+    element.style.removeProperty('--chip-color');
+    return;
+  }
+  if (style.chipBg) element.style.setProperty('--chip-bg', style.chipBg);
+  if (style.chipColor) element.style.setProperty('--chip-color', style.chipColor);
+}
+
+function normalizeCategory(value) {
+  if (typeof value !== 'string') return 'Sem categoria';
+  const trimmed = value.trim();
+  if (!trimmed.length) return 'Sem categoria';
+  if (RESERVED_CATEGORY_VALUES.has(trimmed.toUpperCase())) return 'Sem categoria';
+  if (trimmed.toLowerCase() === 'sem categoria') return 'Sem categoria';
+  return trimmed;
+}
 const posVendasContent = {
   top: [
     {
@@ -205,7 +347,18 @@ async function fetchAll() {
   const snap = await getDocs(col);
   const items = [];
   snap.forEach(d => items.push({ id: d.id, ...d.data() }));
-  lastSnapshot = items
+  const normalized = items.map(item => {
+    const category = normalizeCategory(item.category);
+    const question = typeof item.question === 'string' ? item.question.trim() : item.question || '';
+    const answer = typeof item.answer === 'string' ? item.answer.trim() : item.answer || '';
+    return {
+      ...item,
+      category,
+      question,
+      answer
+    };
+  });
+  lastSnapshot = normalized
     .map(item => ({ ...item, orderIndex: typeof item.orderIndex === 'number' ? item.orderIndex : Number.MAX_SAFE_INTEGER }))
     .sort((a, b) => {
       const orderDiff = (a.orderIndex ?? Number.MAX_SAFE_INTEGER) - (b.orderIndex ?? Number.MAX_SAFE_INTEGER);
@@ -214,7 +367,7 @@ async function fetchAll() {
       if (catDiff !== 0) return catDiff;
       return (a.question || '').localeCompare(b.question || '');
     });
-  categories = new Set(items.map(i => i.category));
+  categories = new Set(normalized.map(i => i.category).filter(Boolean));
 }
 
 async function fetchPosCards() {
@@ -304,24 +457,67 @@ function toggleSearchTools(visible) {
 }
 
 function renderTabs() {
+  if (!tabsEl) return;
   tabsEl.innerHTML = '';
+
   const makeTab = (name) => {
-    const b = document.createElement('button');
-    b.className = 'tab' + (name === currentCategory ? ' active' : '');
-    b.textContent = name;
-    b.addEventListener('click', () => { currentCategory = name; renderList(searchInput.value.trim()); });
-    return b;
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'tab' + (name === currentCategory ? ' active' : '');
+    button.textContent = name;
+    button.setAttribute('aria-pressed', String(name === currentCategory));
+    applyTabStyle(button, name);
+    button.addEventListener('click', () => {
+      currentCategory = name;
+      renderList(searchInput?.value?.trim() || '');
+      renderTabs();
+    });
+    return button;
   };
-  tabsEl.appendChild(makeTab('Todas'));
-  Array.from(categories).sort().forEach(cat => tabsEl.appendChild(makeTab(cat)));
-  tabsEl.appendChild(makeTab(POS_VENDAS_TAB_LABEL));
-  tabsEl.appendChild(makeTab(TIPS_TAB_LABEL));
-  tabsEl.appendChild(makeTab(SUMMARY_TAB_LABEL));
+
+  const rendered = new Set();
+  const groups = [];
+  STATIC_CATEGORY_LAYOUT.forEach(group => {
+    const groupEl = document.createElement('div');
+    groupEl.className = 'tab-group';
+    groups.push(groupEl);
+    tabsEl.appendChild(groupEl);
+    group.categories.forEach(cat => {
+      rendered.add(cat);
+      groupEl.appendChild(makeTab(cat));
+    });
+  });
+
+  const extraGroup = groups[groups.length - 1] || tabsEl;
+  const dynamicCategories = Array.from(categories)
+    .map(cat => normalizeCategory(cat))
+    .filter(cat => cat && !rendered.has(cat))
+    .sort((a, b) => a.localeCompare(b));
+
+  dynamicCategories.forEach(cat => {
+    rendered.add(cat);
+    extraGroup.appendChild(makeTab(cat));
+  });
+
+  [POS_VENDAS_TAB_LABEL, TIPS_TAB_LABEL].forEach(name => {
+    if (rendered.has(name)) return;
+    rendered.add(name);
+    extraGroup.appendChild(makeTab(name));
+  });
 }
 
 function renderCatDatalist() {
+  if (!catListDatalist) return;
   catListDatalist.innerHTML = '';
-  Array.from(categories).sort().forEach(cat => {
+  const staticOptions = STATIC_CATEGORY_LAYOUT.flatMap(group => group.categories);
+  const suggestions = new Set(staticOptions);
+  Array.from(categories).forEach(cat => {
+    const normalized = normalizeCategory(cat);
+    if (normalized) suggestions.add(normalized);
+  });
+  [ALL_TAB_LABEL, SUMMARY_TAB_LABEL, POS_VENDAS_TAB_LABEL, TIPS_TAB_LABEL].forEach(label => suggestions.delete(label));
+  const sorted = Array.from(suggestions).filter(Boolean).sort((a, b) => a.localeCompare(b));
+  sorted.forEach(cat => {
     const opt = document.createElement('option');
     opt.value = cat;
     catListDatalist.appendChild(opt);
@@ -355,7 +551,7 @@ function renderList(searchText='') {
   }
 
   const filter = (item) => {
-    const byCat = (currentCategory === 'Todas' || item.category === currentCategory);
+    const byCat = (currentCategory === ALL_TAB_LABEL || item.category === currentCategory);
     const bySearch = !searchText || (item.question.toLowerCase().includes(searchText.toLowerCase()) || item.answer.toLowerCase().includes(searchText.toLowerCase()));
     return byCat && bySearch;
   };
@@ -610,7 +806,9 @@ function renderItem(item) {
 
   const chip = document.createElement('span');
   chip.className = 'qa-chip';
-  chip.textContent = item.category || 'Sem categoria';
+  const chipCategory = item.category || 'Sem categoria';
+  chip.textContent = chipCategory;
+  applyChipStyle(chip, chipCategory);
 
   const question = document.createElement('h4');
   question.className = 'qa-question';
@@ -1094,7 +1292,7 @@ tipsForm?.addEventListener('submit', async (event) => {
 newForm.addEventListener('submit', async (e) => {
   e.preventDefault();
   const payload = {
-    category: newCategory.value.trim() || 'Sem categoria',
+    category: normalizeCategory(newCategory.value),
     question: newQuestion.value.trim(),
     answer: newAnswer.value,
     createdBy: currentUser?.uid || null,
@@ -1175,7 +1373,7 @@ document.getElementById('btnSaveEdit').addEventListener('click', async (e) => {
   if(!id) return;
   const ref = doc(db, 'faqs', id);
   await updateDoc(ref, {
-    category: editCategory.value.trim() || 'Sem categoria',
+    category: normalizeCategory(editCategory.value),
     question: editQuestion.value.trim(),
     answer: editAnswer.value,
     updatedAt: serverTimestamp()
