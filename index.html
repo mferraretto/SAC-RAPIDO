@@ -46,7 +46,7 @@
             <button id="btnSeed" class="btn btn-secondary" title="Carrega a base inicial se sua coleção estiver vazia">Carregar base (seed)</button>
             <button id="btnReload" class="btn btn-ghost">Recarregar</button>
           </div>
-          <div class="row gap">
+          <div class="row gap" id="searchTools">
             <input id="searchInput" class="input" type="search" placeholder="Buscar por pergunta/resposta...">
             <button id="btnClear" class="btn btn-ghost" title="Limpar busca">Limpar</button>
           </div>
@@ -56,28 +56,66 @@
       <!-- Abas (categorias) -->
       <div id="tabs" class="tabs"></div>
 
-      <!-- Lista de Q&A -->
-      <div id="qaList" class="qa-list"></div>
+      <section id="faqSection">
+        <!-- Lista de Q&A -->
+        <div id="qaList" class="qa-list"></div>
 
-      <!-- Novo Q&A -->
-      <div class="card">
-        <h3>Novo Q&A</h3>
-        <form id="newForm" class="grid-2">
-          <label>Categoria
-            <input type="text" id="newCategory" list="catList" placeholder="Ex.: Entrega & Prazo" required>
-            <datalist id="catList"></datalist>
-          </label>
-          <label>Pergunta / Enunciado
-            <input type="text" id="newQuestion" placeholder="Digite a pergunta..." required>
-          </label>
-          <label class="grid-span-2">Resposta
-            <textarea id="newAnswer" rows="6" placeholder="Cole a resposta exata aqui..." required></textarea>
-          </label>
-          <div class="grid-span-2 right">
-            <button class="btn" type="submit">Salvar</button>
+        <!-- Novo Q&A -->
+        <div class="card" id="newQaCard">
+          <h3>Novo Q&A</h3>
+          <form id="newForm" class="grid-2">
+            <label>Categoria
+              <input type="text" id="newCategory" list="catList" placeholder="Ex.: Entrega &amp; Prazo" required>
+              <datalist id="catList"></datalist>
+            </label>
+            <label>Pergunta / Enunciado
+              <input type="text" id="newQuestion" placeholder="Digite a pergunta..." required>
+            </label>
+            <label class="grid-span-2">Resposta
+              <textarea id="newAnswer" rows="6" placeholder="Cole a resposta exata aqui..." required></textarea>
+            </label>
+            <div class="grid-span-2 right">
+              <button class="btn" type="submit">Salvar</button>
+            </div>
+          </form>
+        </div>
+      </section>
+
+      <section id="tipsSection" style="display:none;">
+        <div class="card">
+          <h3>Nova dica ou recomendação</h3>
+          <form id="tipsForm" class="grid-2">
+            <label>Categoria
+              <input type="text" id="tipCategory" list="tipCatList" placeholder="Ex.: Pós-venda" required>
+              <datalist id="tipCatList"></datalist>
+            </label>
+            <label class="grid-span-2">Dica ou recomendação
+              <textarea id="tipContent" rows="5" placeholder="Digite a dica ou recomendação..." required></textarea>
+            </label>
+            <div class="grid-span-2 right">
+              <button class="btn" type="submit">Salvar dica</button>
+            </div>
+          </form>
+        </div>
+        <div id="tipsList" class="tips-list"></div>
+      </section>
+
+      <section id="summarySection" style="display:none;">
+        <div class="card summary-card">
+          <h3>Resumo de cópias</h3>
+          <div class="summary-controls">
+            <label>Data inicial
+              <input type="date" id="summaryDateFrom">
+            </label>
+            <label>Data final
+              <input type="date" id="summaryDateTo">
+            </label>
+            <button type="button" id="summaryClearFilters" class="btn btn-ghost">Limpar filtros</button>
           </div>
-        </form>
-      </div>
+          <p class="muted small" id="summaryTotals"></p>
+        </div>
+        <div id="summaryList" class="card summary-table-card"></div>
+      </section>
     </section>
 
     <!-- Modal editar -->

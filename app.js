@@ -1,7 +1,7 @@
 // App logic (modular Firebase v9 via CDN)
 import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-auth.js";
-import { getFirestore, collection, addDoc, getDocs, query, serverTimestamp, updateDoc, doc, deleteDoc, limit, writeBatch } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
+import { getFirestore, collection, addDoc, getDocs, query, serverTimestamp, updateDoc, doc, deleteDoc, limit, writeBatch, orderBy, increment } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
 import { firebaseConfig } from "./firebase-config.js";
 
 const app = initializeApp(firebaseConfig);
@@ -19,6 +19,24 @@ const searchInput = document.getElementById('searchInput');
 const btnClear = document.getElementById('btnClear');
 const btnReload = document.getElementById('btnReload');
 const btnSeed = document.getElementById('btnSeed');
+const searchTools = document.getElementById('searchTools');
+
+const faqSection = document.getElementById('faqSection');
+const tipsSection = document.getElementById('tipsSection');
+const summarySection = document.getElementById('summarySection');
+const newQaCard = document.getElementById('newQaCard');
+
+const tipsForm = document.getElementById('tipsForm');
+const tipCategory = document.getElementById('tipCategory');
+const tipContent = document.getElementById('tipContent');
+const tipsListEl = document.getElementById('tipsList');
+const tipCatList = document.getElementById('tipCatList');
+
+const summaryListEl = document.getElementById('summaryList');
+const summaryTotalsEl = document.getElementById('summaryTotals');
+const summaryDateFrom = document.getElementById('summaryDateFrom');
+const summaryDateTo = document.getElementById('summaryDateTo');
+const summaryClearFilters = document.getElementById('summaryClearFilters');
 
 const newForm = document.getElementById('newForm');
 const newCategory = document.getElementById('newCategory');
@@ -47,11 +65,18 @@ let currentCategory = 'Todas';
 let categories = new Set();
 let lastSnapshot = [];
 let posCards = [];
+let tips = [];
+let tipCategories = new Set();
+let copyLogs = [];
+let allTimeLogStats = new Map();
 let posSeedEnsured = false;
 let draggingQaCard = null;
 let draggingPosCard = null;
 
 const POS_VENDAS_TAB_LABEL = 'Pós-vendas / Quebras';
+const TIPS_TAB_LABEL = 'Dicas e Recomendações';
+const SUMMARY_TAB_LABEL = 'Resumo';
+const DATE_TIME_FORMATTER = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
 const posVendasContent = {
   top: [
     {
@@ -173,6 +198,8 @@ onAuthStateChanged(auth, async (user) => {
 // --- Firestore helpers ---
 const col = collection(db, 'faqs');
 const posCol = collection(db, 'posVendasCards');
+const tipsCol = collection(db, 'tips');
+const copyLogCol = collection(db, 'faqCopyLogs');
 
 async function fetchAll() {
   const snap = await getDocs(col);
@@ -214,6 +241,68 @@ async function fetchPosCards() {
     });
 }
 
+async function fetchTips() {
+  const snap = await getDocs(tipsCol);
+  const items = [];
+  snap.forEach(d => items.push({ id: d.id, ...d.data() }));
+  tips = items
+    .map(item => {
+      const createdAt = item.createdAt?.toDate ? item.createdAt.toDate() : null;
+      const updatedAt = item.updatedAt?.toDate ? item.updatedAt.toDate() : null;
+      return {
+        ...item,
+        category: item.category?.trim() || 'Sem categoria',
+        content: item.content?.trim?.() || item.text?.trim?.() || '',
+        createdAt,
+        updatedAt
+      };
+    })
+    .sort((a, b) => {
+      const catDiff = (a.category || '').localeCompare(b.category || '');
+      if (catDiff !== 0) return catDiff;
+      const timeA = (a.updatedAt || a.createdAt)?.getTime?.() ?? 0;
+      const timeB = (b.updatedAt || b.createdAt)?.getTime?.() ?? 0;
+      if (timeA === timeB) {
+        return (a.content || '').localeCompare(b.content || '');
+      }
+      return timeB - timeA;
+    });
+  tipCategories = new Set(tips.map(item => item.category).filter(Boolean));
+}
+
+async function fetchCopyLogs() {
+  const logQuery = query(copyLogCol, orderBy('copiedAt', 'desc'));
+  const snap = await getDocs(logQuery);
+  const logs = [];
+  snap.forEach(d => {
+    const data = d.data();
+    const copiedAt = data.copiedAt?.toDate ? data.copiedAt.toDate() : null;
+    logs.push({
+      id: d.id,
+      faqId: data.faqId || null,
+      category: data.category || 'Sem categoria',
+      question: data.question || '',
+      copiedBy: data.copiedBy || null,
+      copiedAt
+    });
+  });
+  copyLogs = logs;
+  allTimeLogStats = buildLogStats(copyLogs);
+}
+
+function showSection(section) {
+  if (faqSection) faqSection.style.display = section === 'faq' ? '' : 'none';
+  if (tipsSection) tipsSection.style.display = section === 'tips' ? '' : 'none';
+  if (summarySection) summarySection.style.display = section === 'summary' ? '' : 'none';
+}
+
+function toggleSearchTools(visible) {
+  if (!searchTools) return;
+  searchTools.style.display = visible ? '' : 'none';
+  if (searchInput) searchInput.disabled = !visible;
+  if (btnClear) btnClear.disabled = !visible;
+}
+
 function renderTabs() {
   tabsEl.innerHTML = '';
   const makeTab = (name) => {
@@ -226,6 +315,8 @@ function renderTabs() {
   tabsEl.appendChild(makeTab('Todas'));
   Array.from(categories).sort().forEach(cat => tabsEl.appendChild(makeTab(cat)));
   tabsEl.appendChild(makeTab(POS_VENDAS_TAB_LABEL));
+  tabsEl.appendChild(makeTab(TIPS_TAB_LABEL));
+  tabsEl.appendChild(makeTab(SUMMARY_TAB_LABEL));
 }
 
 function renderCatDatalist() {
@@ -238,12 +329,31 @@ function renderCatDatalist() {
 }
 
 function renderList(searchText='') {
+  if (currentCategory === TIPS_TAB_LABEL) {
+    showSection('tips');
+    toggleSearchTools(false);
+    renderTips();
+    return;
+  }
+
+  if (currentCategory === SUMMARY_TAB_LABEL) {
+    showSection('summary');
+    toggleSearchTools(false);
+    renderSummary();
+    return;
+  }
+
+  showSection('faq');
+  toggleSearchTools(true);
   qaListEl.classList.remove('pos-vendas-mode');
   qaListEl.innerHTML = '';
+  if (newQaCard) newQaCard.style.display = currentCategory === POS_VENDAS_TAB_LABEL ? 'none' : '';
+
   if(currentCategory === POS_VENDAS_TAB_LABEL) {
     renderPosVendas();
     return;
   }
+
   const filter = (item) => {
     const byCat = (currentCategory === 'Todas' || item.category === currentCategory);
     const bySearch = !searchText || (item.question.toLowerCase().includes(searchText.toLowerCase()) || item.answer.toLowerCase().includes(searchText.toLowerCase()));
@@ -261,6 +371,230 @@ function renderList(searchText='') {
 
   items.forEach(item => qaListEl.appendChild(renderItem(item)));
   setupQaDragAndDrop();
+}
+
+function renderTipCatDatalist() {
+  if (!tipCatList) return;
+  tipCatList.innerHTML = '';
+  Array.from(tipCategories).sort().forEach(cat => {
+    const opt = document.createElement('option');
+    opt.value = cat;
+    tipCatList.appendChild(opt);
+  });
+}
+
+function renderTips() {
+  if (!tipsListEl) return;
+  renderTipCatDatalist();
+  tipsListEl.innerHTML = '';
+  if (!tips.length) {
+    const empty = document.createElement('div');
+    empty.className = 'tips-empty';
+    empty.textContent = 'Nenhuma dica cadastrada ainda.';
+    tipsListEl.appendChild(empty);
+    return;
+  }
+
+  const grouped = tips.reduce((acc, tip) => {
+    const cat = tip.category || 'Sem categoria';
+    if (!acc.has(cat)) acc.set(cat, []);
+    acc.get(cat).push(tip);
+    return acc;
+  }, new Map());
+
+  Array.from(grouped.keys()).sort().forEach(cat => {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'card tips-category';
+
+    const title = document.createElement('h4');
+    title.textContent = cat;
+    wrapper.appendChild(title);
+
+    const list = document.createElement('ul');
+    list.className = 'tips-items';
+
+    grouped.get(cat)
+      .sort((a, b) => {
+        const timeA = (a.updatedAt || a.createdAt)?.getTime?.() ?? 0;
+        const timeB = (b.updatedAt || b.createdAt)?.getTime?.() ?? 0;
+        if (timeA === timeB) return (a.content || '').localeCompare(b.content || '');
+        return timeB - timeA;
+      })
+      .forEach(tip => {
+        const li = document.createElement('li');
+        li.className = 'tips-item';
+
+        const content = document.createElement('div');
+        content.className = 'tips-item__content';
+        const text = document.createElement('p');
+        text.textContent = tip.content || '';
+        content.appendChild(text);
+
+        const metaText = tip.updatedAt || tip.createdAt;
+        if (metaText) {
+          const info = document.createElement('span');
+          info.className = 'small muted';
+          info.textContent = `Atualizado em ${DATE_TIME_FORMATTER.format(metaText)}`;
+          content.appendChild(info);
+        }
+
+        const actions = document.createElement('div');
+        actions.className = 'tips-item__meta';
+        const deleteBtn = document.createElement('button');
+        deleteBtn.className = 'btn btn-ghost btn-icon';
+        deleteBtn.innerHTML = '<span class="material-symbols-rounded">delete</span><span>Excluir</span>';
+        deleteBtn.addEventListener('click', () => deleteTip(tip));
+        actions.appendChild(deleteBtn);
+
+        li.appendChild(content);
+        li.appendChild(actions);
+        list.appendChild(li);
+      });
+
+    wrapper.appendChild(list);
+    tipsListEl.appendChild(wrapper);
+  });
+}
+
+function parseDateInput(value, endOfDay = false) {
+  if (!value) return null;
+  const date = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return null;
+  if (endOfDay) date.setHours(23, 59, 59, 999);
+  return date;
+}
+
+function buildLogStats(logs) {
+  const stats = new Map();
+  logs.forEach(log => {
+    if (!log.faqId) return;
+    const entry = stats.get(log.faqId) || { count: 0, lastCopy: null };
+    entry.count += 1;
+    if (log.copiedAt && (!entry.lastCopy || log.copiedAt > entry.lastCopy)) {
+      entry.lastCopy = log.copiedAt;
+    }
+    stats.set(log.faqId, entry);
+  });
+  return stats;
+}
+
+function renderSummary() {
+  if (!summaryListEl) return;
+
+  const from = parseDateInput(summaryDateFrom?.value || '');
+  const to = parseDateInput(summaryDateTo?.value || '', true);
+  const filteredLogs = copyLogs.filter(log => {
+    if (!log.copiedAt) return !(from || to);
+    if (from && log.copiedAt < from) return false;
+    if (to && log.copiedAt > to) return false;
+    return true;
+  });
+  const filteredStats = buildLogStats(filteredLogs);
+  const totalCopies = Array.from(filteredStats.values()).reduce((sum, entry) => sum + entry.count, 0);
+  if (summaryTotalsEl) {
+    const label = (from || to) ? 'Total de cópias no período' : 'Total de cópias registradas';
+    summaryTotalsEl.textContent = `${label}: ${totalCopies}`;
+  }
+
+  summaryListEl.innerHTML = '';
+  const faqMap = new Map(lastSnapshot.map(item => [item.id, item]));
+  const rows = Array.from(faqMap.values()).map(item => {
+    const filtered = filteredStats.get(item.id) || { count: 0, lastCopy: null };
+    const overall = allTimeLogStats.get(item.id) || { count: item.copyCount || 0, lastCopy: null };
+    if (overall.count === undefined) overall.count = item.copyCount || 0;
+    return {
+      id: item.id,
+      question: item.question,
+      category: item.category,
+      filteredCount: filtered.count || 0,
+      totalCount: overall.count || 0,
+      lastCopy: overall.lastCopy || null,
+      orphan: false
+    };
+  });
+
+  filteredStats.forEach((value, id) => {
+    if (faqMap.has(id)) return;
+    const log = copyLogs.find(entry => entry.faqId === id);
+    rows.push({
+      id,
+      question: log?.question || '(Resposta removida)',
+      category: log?.category || 'Sem categoria',
+      filteredCount: value.count,
+      totalCount: (allTimeLogStats.get(id)?.count) || value.count,
+      lastCopy: (allTimeLogStats.get(id)?.lastCopy) || value.lastCopy || null,
+      orphan: true
+    });
+  });
+
+  if (!rows.length) {
+    const empty = document.createElement('div');
+    empty.className = 'summary-empty';
+    empty.textContent = 'Nenhuma resposta disponível para exibir.';
+    summaryListEl.appendChild(empty);
+    return;
+  }
+
+  rows.sort((a, b) => {
+    if (b.filteredCount !== a.filteredCount) return b.filteredCount - a.filteredCount;
+    if (b.totalCount !== a.totalCount) return b.totalCount - a.totalCount;
+    return (a.question || '').localeCompare(b.question || '');
+  });
+
+  const table = document.createElement('table');
+  table.className = 'summary-table';
+
+  const thead = document.createElement('thead');
+  const headRow = document.createElement('tr');
+  ['Pergunta', 'Categoria', 'Cópias (período)', 'Cópias (total)', 'Última cópia'].forEach(label => {
+    const th = document.createElement('th');
+    th.textContent = label;
+    headRow.appendChild(th);
+  });
+  thead.appendChild(headRow);
+  table.appendChild(thead);
+
+  const tbody = document.createElement('tbody');
+  rows.forEach(row => {
+    const tr = document.createElement('tr');
+
+    const questionTd = document.createElement('td');
+    const questionTitle = document.createElement('div');
+    questionTitle.textContent = row.question || '(Sem pergunta)';
+    questionTitle.style.fontWeight = '600';
+    questionTd.appendChild(questionTitle);
+    if (row.orphan) {
+      const badge = document.createElement('span');
+      badge.className = 'small muted';
+      badge.textContent = 'Resposta removida';
+      questionTd.appendChild(badge);
+    }
+    tr.appendChild(questionTd);
+
+    const categoryTd = document.createElement('td');
+    categoryTd.textContent = row.category || 'Sem categoria';
+    tr.appendChild(categoryTd);
+
+    const filteredTd = document.createElement('td');
+    filteredTd.className = 'count';
+    filteredTd.textContent = String(row.filteredCount || 0);
+    tr.appendChild(filteredTd);
+
+    const totalTd = document.createElement('td');
+    totalTd.className = 'count';
+    totalTd.textContent = String(row.totalCount || 0);
+    tr.appendChild(totalTd);
+
+    const lastTd = document.createElement('td');
+    lastTd.className = 'last-copy';
+    lastTd.textContent = row.lastCopy ? DATE_TIME_FORMATTER.format(row.lastCopy) : '—';
+    tr.appendChild(lastTd);
+
+    tbody.appendChild(tr);
+  });
+
+  table.appendChild(tbody);
+  summaryListEl.appendChild(table);
 }
 
 function renderItem(item) {
@@ -332,6 +666,7 @@ function renderItem(item) {
     }
     try {
       await navigator.clipboard.writeText(answerText);
+      recordFaqCopy(item);
       btnCopy.innerHTML = '<span class="material-symbols-rounded">done</span><span>Copiado</span>';
       feedback.style.display = 'flex';
       setTimeout(() => {
@@ -724,6 +1059,38 @@ btnReload.addEventListener('click', reload);
 btnClear.addEventListener('click', () => { searchInput.value=''; renderList(''); });
 searchInput.addEventListener('input', (e) => renderList(e.target.value.trim()));
 
+summaryDateFrom?.addEventListener('change', () => {
+  if (currentCategory === SUMMARY_TAB_LABEL) renderSummary();
+});
+
+summaryDateTo?.addEventListener('change', () => {
+  if (currentCategory === SUMMARY_TAB_LABEL) renderSummary();
+});
+
+summaryClearFilters?.addEventListener('click', () => {
+  if (summaryDateFrom) summaryDateFrom.value = '';
+  if (summaryDateTo) summaryDateTo.value = '';
+  if (currentCategory === SUMMARY_TAB_LABEL) renderSummary();
+});
+
+tipsForm?.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const payload = {
+    category: tipCategory.value.trim() || 'Sem categoria',
+    content: tipContent.value.trim(),
+    createdBy: currentUser?.uid || null,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp()
+  };
+  if (!payload.content) {
+    alert('Digite a dica ou recomendação.');
+    return;
+  }
+  await addDoc(tipsCol, payload);
+  tipsForm.reset();
+  await reload();
+});
+
 newForm.addEventListener('submit', async (e) => {
   e.preventDefault();
   const payload = {
@@ -733,7 +1100,8 @@ newForm.addEventListener('submit', async (e) => {
     createdBy: currentUser?.uid || null,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
-    orderIndex: lastSnapshot.length
+    orderIndex: lastSnapshot.length,
+    copyCount: 0
   };
   if(!payload.question || !payload.answer) return alert('Preencha pergunta e resposta.');
   await addDoc(col, payload);
@@ -747,12 +1115,58 @@ async function onDelete(item) {
   await reload();
 }
 
+async function deleteTip(tip) {
+  if (!tip?.id) return;
+  if (!confirm('Excluir esta dica?')) return;
+  await deleteDoc(doc(db, 'tips', tip.id));
+  await reload();
+}
+
 function openEdit(item) {
   editId.value = item.id;
   editCategory.value = item.category;
   editQuestion.value = item.question;
   editAnswer.value = item.answer;
   editDialog.showModal();
+}
+
+async function recordFaqCopy(item) {
+  if (!item?.id) return;
+  const payload = {
+    faqId: item.id,
+    category: item.category || 'Sem categoria',
+    question: item.question || '',
+    copiedBy: currentUser?.uid || null,
+    copiedAt: serverTimestamp()
+  };
+  try {
+    const ref = await addDoc(copyLogCol, payload);
+    const now = new Date();
+    const localEntry = {
+      id: ref.id,
+      faqId: payload.faqId,
+      category: payload.category,
+      question: payload.question,
+      copiedBy: payload.copiedBy,
+      copiedAt: now
+    };
+    copyLogs = [localEntry, ...copyLogs];
+    allTimeLogStats = buildLogStats(copyLogs);
+    const index = lastSnapshot.findIndex(faq => faq.id === item.id);
+    if (index >= 0) {
+      const current = lastSnapshot[index];
+      lastSnapshot.splice(index, 1, { ...current, copyCount: (current.copyCount || 0) + 1 });
+    }
+    await updateDoc(doc(db, 'faqs', item.id), {
+      copyCount: increment(1),
+      updatedAt: serverTimestamp()
+    }).catch(() => {});
+    if (currentCategory === SUMMARY_TAB_LABEL) {
+      renderSummary();
+    }
+  } catch (err) {
+    console.error('Erro ao registrar cópia da resposta', err);
+  }
 }
 
 document.getElementById('btnSaveEdit').addEventListener('click', async (e) => {
@@ -799,9 +1213,12 @@ async function ensureSeed() {
 async function reload() {
   await Promise.all([
     fetchAll(),
-    fetchPosCards()
+    fetchPosCards(),
+    fetchTips(),
+    fetchCopyLogs()
   ]);
   renderTabs();
   renderCatDatalist();
+  renderTipCatDatalist();
   renderList(searchInput.value.trim());
 }
