@@ -108,6 +108,58 @@ input::placeholder, textarea::placeholder { color: #94a3b8; }
 .btn-danger { background: var(--danger); }
 .btn-danger:hover { filter: brightness(1.05); }
 .btn-icon { padding: 10px 12px; }
+.btn-small { padding: 8px 12px; font-size: 13px; }
+
+.pwa-status {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 12px 18px;
+  margin: 0 auto;
+  border-bottom: 1px solid var(--border);
+  background: rgba(255, 245, 245, 0.92);
+  color: var(--danger);
+  font-weight: 500;
+  letter-spacing: 0.1px;
+  position: sticky;
+  top: 60px;
+  z-index: 9;
+  backdrop-filter: blur(12px);
+}
+
+.pwa-status .material-symbols-rounded {
+  font-size: 20px;
+}
+
+.pwa-status button {
+  color: var(--danger);
+  border-color: rgba(239, 68, 68, 0.25);
+}
+
+.pwa-status button:hover {
+  border-color: rgba(239, 68, 68, 0.45);
+}
+
+.pwa-status.is-offline {
+  border-bottom-color: rgba(239, 68, 68, 0.45);
+}
+
+.pwa-status button.offline {
+  opacity: 0.75;
+}
+
+@media (max-width: 640px) {
+  .pwa-status {
+    flex-direction: column;
+    text-align: center;
+  }
+
+  .pwa-status button {
+    width: 100%;
+    justify-content: center;
+  }
+}
 
 .tabs {
   display:flex;

@@ -2,6 +2,7 @@
   "name": "SAC – Central de Perguntas e Respostas",
   "short_name": "SAC",
   "start_url": ".",
+  "scope": ".",
   "display": "standalone",
   "background_color": "#f6f8fc",
   "theme_color": "#0b5ed7",

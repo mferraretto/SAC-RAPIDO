@@ -4,6 +4,11 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <meta name="theme-color" content="#0b5ed7" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="application-name" content="SAC – Central de Perguntas e Respostas" />
+  <meta name="description" content="Central colaborativa para perguntas, respostas e conteúdo de pós-venda." />
   <title>SAC – Central de Perguntas e Respostas</title>
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" type="image/png" sizes="32x32" href="icons/icon-192.png">
@@ -19,9 +24,16 @@
     <div class="logo">SAC</div>
     <nav class="auth-nav">
       <span id="userEmail" class="muted"></span>
+      <button id="btnInstall" class="btn btn-secondary" type="button" hidden>Instalar app</button>
       <button id="btnLogout" class="btn btn-ghost" style="display:none">Sair</button>
     </nav>
   </header>
+
+  <div id="pwaStatus" class="pwa-status" hidden role="status" aria-live="polite">
+    <span class="material-symbols-rounded" aria-hidden="true">cloud_off</span>
+    <span>Sem conexão. Algumas funcionalidades podem ficar indisponíveis.</span>
+    <button id="btnRetrySync" class="btn btn-ghost btn-small" type="button">Tentar sincronizar</button>
+  </div>
 
   <main class="container">
     <!-- Login / Registro -->

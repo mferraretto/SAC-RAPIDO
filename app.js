@@ -12,6 +12,7 @@ const authSection = document.getElementById('authSection');
 const appSection = document.getElementById('appSection');
 const userEmailSpan = document.getElementById('userEmail');
 const btnLogout = document.getElementById('btnLogout');
+const installButton = document.getElementById('btnInstall');
 const tabsEl = document.getElementById('tabs');
 const qaListEl = document.getElementById('qaList');
 const catListDatalist = document.getElementById('catList');
@@ -20,6 +21,8 @@ const btnClear = document.getElementById('btnClear');
 const btnReload = document.getElementById('btnReload');
 const btnSeed = document.getElementById('btnSeed');
 const searchTools = document.getElementById('searchTools');
+const pwaStatusBanner = document.getElementById('pwaStatus');
+const retrySyncButton = document.getElementById('btnRetrySync');
 
 const faqSection = document.getElementById('faqSection');
 const tipsSection = document.getElementById('tipsSection');
@@ -37,6 +40,9 @@ const summaryTotalsEl = document.getElementById('summaryTotals');
 const summaryDateFrom = document.getElementById('summaryDateFrom');
 const summaryDateTo = document.getElementById('summaryDateTo');
 const summaryClearFilters = document.getElementById('summaryClearFilters');
+
+let deferredInstallPrompt = null;
+let serviceWorkerRegistration = null;
 
 const newForm = document.getElementById('newForm');
 const newCategory = document.getElementById('newCategory');
@@ -1059,6 +1065,57 @@ btnReload.addEventListener('click', reload);
 btnClear.addEventListener('click', () => { searchInput.value=''; renderList(''); });
 searchInput.addEventListener('input', (e) => renderList(e.target.value.trim()));
 
+installButton?.addEventListener('click', async () => {
+  if (!deferredInstallPrompt) return;
+  installButton.disabled = true;
+  try {
+    deferredInstallPrompt.prompt();
+    const { outcome } = await deferredInstallPrompt.userChoice;
+    deferredInstallPrompt = null;
+    if (outcome === 'accepted') {
+      installButton.hidden = true;
+    } else {
+      installButton.hidden = false;
+    }
+  } catch (err) {
+    console.error('Erro ao solicitar instalação do app', err);
+  } finally {
+    installButton.disabled = false;
+  }
+});
+
+retrySyncButton?.addEventListener('click', async () => {
+  if (!navigator.onLine) {
+    alert('Ainda sem conexão. Tente novamente quando estiver online.');
+    return;
+  }
+  retrySyncButton.disabled = true;
+  try {
+    await reload();
+  } catch (err) {
+    console.error('Erro ao sincronizar dados', err);
+    alert('Não foi possível sincronizar agora. Verifique sua conexão e tente novamente.');
+  } finally {
+    retrySyncButton.disabled = false;
+    updateOnlineStatus();
+  }
+});
+
+window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+window.addEventListener('appinstalled', () => {
+  deferredInstallPrompt = null;
+  if (installButton) {
+    installButton.hidden = true;
+    installButton.disabled = false;
+  }
+});
+
+window.addEventListener('online', updateOnlineStatus);
+window.addEventListener('offline', updateOnlineStatus);
+
+updateOnlineStatus();
+registerServiceWorker();
+
 summaryDateFrom?.addEventListener('change', () => {
   if (currentCategory === SUMMARY_TAB_LABEL) renderSummary();
 });
@@ -1183,6 +1240,66 @@ document.getElementById('btnSaveEdit').addEventListener('click', async (e) => {
   editDialog.close();
   await reload();
 });
+
+function handleBeforeInstallPrompt(event) {
+  event.preventDefault();
+  deferredInstallPrompt = event;
+  if (installButton) {
+    installButton.hidden = false;
+    installButton.disabled = false;
+  }
+}
+
+function updateOnlineStatus() {
+  if (!pwaStatusBanner) return;
+  const isOnline = navigator.onLine;
+  pwaStatusBanner.hidden = isOnline;
+  pwaStatusBanner.classList.toggle('is-offline', !isOnline);
+  if (retrySyncButton) {
+    retrySyncButton.classList.toggle('offline', !isOnline);
+  }
+}
+
+function registerServiceWorker() {
+  if (!('serviceWorker' in navigator)) return;
+
+  let hadController = !!navigator.serviceWorker.controller;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!hadController) {
+      hadController = true;
+      return;
+    }
+    window.location.reload();
+  });
+
+  window.addEventListener('load', async () => {
+    try {
+      serviceWorkerRegistration = await navigator.serviceWorker.register('./sw.js');
+
+      navigator.serviceWorker.ready
+        .then((registration) => {
+          serviceWorkerRegistration = registration;
+        })
+        .catch(() => {});
+
+      if (serviceWorkerRegistration.waiting && navigator.serviceWorker.controller) {
+        serviceWorkerRegistration.waiting.postMessage({ type: 'SKIP_WAITING' });
+      }
+
+      serviceWorkerRegistration.addEventListener('updatefound', () => {
+        const newWorker = serviceWorkerRegistration.installing;
+        if (!newWorker) return;
+        newWorker.addEventListener('statechange', () => {
+          if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+            serviceWorkerRegistration.waiting?.postMessage({ type: 'SKIP_WAITING' });
+          }
+        });
+      });
+    } catch (err) {
+      console.error('Falha ao registrar service worker', err);
+    }
+  });
+}
 
 // Seed exact user-provided content (only adds if collection is empty)
 const seedPayload = [{"category": "Entrega & Prazo", "question": "MUDANÇA DE PRAZO", "answer": "Oii, tudo bem? Peço desculpas por isso, essas mudanças \ntambém nos afetam, infelizmente como a entrega e \n\nfeita pela shopee nos não temos controle da mesma.  \nMas não se preocupe, estou do seu lado! Já acionei a \n\nShopee para que deem prioridade ao seu pedido e \nagilizem a entrega."}, {"category": "Entrega & Prazo", "question": "Não entregue, parado — TEM COMO CHEGAR ATÉ ESSA DATA?", "answer": "Oii tudo bem? Eu acredito que chega sim, mas infelizmente não consigo te dar data \nexata de chegada, pois todas nossas entregas são feitas pela shopee express, nos \n\nnão temos controle da mesma.\n\nSinto muito pelo problema com a entrega, entendo o quanto isso pode ser \nfrustrante. Infelizmente, como a Shopee é responsável pelo processo de \nenvio, não tenho controle direto sobre a situação, mas estou aqui para \n\najudar no que for possível!\n\nPara agilizar a solução, já abri um chamado reforçando a urgência do seu \ncaso. Além disso, você pode entrar em contato diretamente com o suporte \nda Shopee pelo aplicativo. Basta acessar o app, ir até a seção de 'Ajuda' e \n\niniciar um chat com a equipe de suporte.\n\nSe precisar de algo mais, estarei à disposição!"}, {"category": "Frete, Endereço & Rastreio", "question": "COBRANDO FRETE", "answer": "Bom dia tudo bem? peço desculpa, mas infelizmente o frete gratis não e ofertado pelos vendedores e sim pela propria plataforma shopee para algumas regiões, por \nconta disso não temos controle sobre o valor cobrado."}, {"category": "Frete, Endereço & Rastreio", "question": "MUDAR ENDEREÇO", "answer": "Oii, tudo bem? Peço desculpas, eu não tenho acesso para trocar endereço de entrega, o único que pode fazer isso e o shopee, ou cancelando o pedido e \nrefazendo."}, {"category": "Frete, Endereço & Rastreio", "question": "COBRANDO TAXA", "answer": "Oii tudo bem? A shopee não cobra nada fora do aplicativo, qualquer coisa cobrada fora do aplicativo shopee e golpe, peço que denuncie."}, {"category": "Frete, Endereço & Rastreio", "question": "Quero o rastreio do pedido", "answer": "Oii tudo bem? Já foi enviado, para fazer o rastreio e só entrar dentro do seu pedido, na propria shopee, os envios são feitos pela shopee \nexpress"}, {"category": "Frete, Endereço & Rastreio", "question": "Envia por onde?", "answer": "Oii tudo bem? Os envios são feitos pela shopee express"}, {"category": "Frete, Endereço & Rastreio", "question": "Quanto fica o frete?", "answer": "Oii tudo bem? O calculo do frete e feito dentro do proprio anuncio"}, {"category": "Pós-venda & Reclamações", "question": "Devoluções, trocas e reembolso", "answer": "As devoluções, trocas e reembolso são feitas pela shopee. E preciso \ndevolver todo o kit. Para fazer isso, vá até “A caminho” em “Minhas \n\ncompras” através da guia “Eu“ > selecione o pedido > clique em \n“Pedido de Reembolso“. Em seguida, selecione o motivo de \n\ndevolução/reembolso > escolha a “Razão” > forneça evidência e \ndescrição (se aplicável) > clique em ”Enviar”."}, {"category": "Pós-venda & Reclamações", "question": "OPÇÃO 3 – Envio nova peça", "answer": "Para a opção 3 envio de uma nova peça sem precisar devolver nada, Só precisa \ncomprar este anúncio simbólico de R$ 2,00 que estou te enviando, nele você \n\nconsegue verificar o valor do frete. Ele serve apenas para gerar a etiqueta de envio \nda sua nova peça, caso tenha um cupom da Shopee, pode usar para ganhar frete \n\ngrátis. Depois disso, é só acompanhar o rastreio direto pelo pedido na Shopee. \nAssim você recebe rapidinho a peça nova, de forma prática e segura. 💖"}, {"category": "Pós-venda & Reclamações", "question": "Reclamação — quebrado, sem foto", "answer": "Oii, espero que esteja bem. Sinto muito por isso! Para que eu possa te ajudar \nda melhor forma, você poderia me enviar uma foto do item? Assim consigo \n\nentender melhor o que aconteceu e buscar a melhor solução para você."}, {"category": "Pós-venda & Reclamações", "question": "Reclamação cilindro quebrado — com foto", "answer": "Olá! Sentimos muito pelo ocorrido. Podemos resolver de 3 formas:\n 1 Reembolso parcial — você fica com o produto e recebe parte do valor de volta.\n\n2 Devolução pelo app da Shopee — com reembolso total após o retorno.\n3 Envio de nova peça — sem custo pela peça, você paga apenas o frete, e não \n\nprecisa devolver nada.\nMe avisa qual opção prefere que resolvo tudo por aqui!"}, {"category": "Pós-venda & Reclamações", "question": "Reclamação arco quebrado — com foto", "answer": "Oii, tudo bem? Peço mil desculpas. Posso te enviar peças \nnovas para repor as quebradas. Pode ser?"}, {"category": "Pós-venda & Reclamações", "question": "OPÇÃO 1 – Reembolso parcial (como solicitar)", "answer": "Olá! Para solicitar o reembolso parcial, siga estes passos: 1- Acesse \nMinhas Compras no app da Shopee 2- Selecione o pedido 3- Clique \nem Devolver/Reembolsar 4- Escolha Reembolso Parcial e adicione \n\nfotos e descrição do problema. Qualquer dúvida, estamos aqui para \najudar!. "}, {"category": "Itens faltando & Brindes", "question": "FALTA brinde", "answer": "Olá tudo bem? Peço desculpas \nem nome da Casa Rosa pelo \nnosso erro, eu posso estar te \n\nenviando o brinde, ou se \npreferir posso te dar um \n\ncupom de 30% de desconto \npara a proxima compra."}, {"category": "Itens faltando & Brindes", "question": "FALTA cilindro", "answer": "Olá, tudo bem? Quero pedir desculpas pelo transtorno. \nInfelizmente, as outras peças parecem ter sido extraviado pela \n\ntransportadora devido ao tamanho. Para resolver isso \nrapidamente, posso reembolsar o valor referente ao kit que \n\nfaltou, permitindo que você compre outro e receba o produto o \nquanto antes.\n\nPara agilizar o processo, por favor, abra um pedido de \nreembolso e informe que se trata de um reembolso parcial, \n\nconforme descrito no próprio pedido. Assim que isso for feito, \nliberarei o valor para você.\n\nSe tiver qualquer dúvida ou precisar de mais alguma coisa, \nestou aqui para ajudar!"}, {"category": "Itens faltando & Brindes", "question": "PEÇA FALTANDO", "answer": "Olá tudo bem? Peço desculpas em \nnome da Casa Rosa pelo nosso erro, \neu posso estar te enviando as peças \nque faltaram pode ser? Só me passa \n\ncertinho quais foram as peças"}, {"category": "Informações de Produto", "question": "Medidas – Mini painel e arcos", "answer": "Mini painel brinde dos cilindros tem 28cm x 28cmMINI\nO arco redondo P tem 80cm x 80cm no arco e com o suporte ele fica com 1.50m de alturaP5\nO arco romano com borda tem 1.85m x 91cm, e também pode ser montado com 1,10x91P3\n\nP4 O arco redondo G tem 1.50m x 1.50m no arco e com o suporte ele fica com 2.00m de altura\n\nA11 O arco romano sem borda tem 1.75m x 91cm, e também pode ser montado com 1,10x91\n\nT6 Trio de Cilindros; G 80CM X 50CM / M 58cm x 43cm / P 45cm x 36cm"}];
