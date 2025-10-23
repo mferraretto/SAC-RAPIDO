@@ -1,0 +1,47 @@
+{
+  "name": "sac-rapido",
+  "version": "1.0.0",
+  "description": "Aplicação desktop para o SAC-RAPIDO usando Electron",
+  "main": "main.js",
+  "author": "",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder"
+  },
+  "devDependencies": {
+    "electron": "^27.1.3",
+    "electron-builder": "^24.6.4"
+  },
+  "build": {
+    "appId": "com.sacrapido.desktop",
+    "productName": "SAC RAPIDO",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "**/*",
+      "!dist",
+      "!node_modules/.cache"
+    ],
+    "win": {
+      "target": [
+        "nsis",
+        "zip"
+      ]
+    },
+    "mac": {
+      "target": [
+        "dmg",
+        "zip"
+      ]
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb",
+        "tar.gz"
+      ]
+    }
+  }
+}
