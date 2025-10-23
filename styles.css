@@ -43,7 +43,12 @@ a { color: var(--primary); text-decoration: none; }
   letter-spacing: .5px;
   font-size: 20px;
 }
-.auth-nav .btn { margin-left: 8px; }
+.auth-nav {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.auth-nav .btn { margin-left: 0; }
 
 .card {
   background: var(--card);

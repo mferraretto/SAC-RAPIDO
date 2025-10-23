@@ -46,6 +46,71 @@ const newCategory = document.getElementById('newCategory');
 const newQuestion = document.getElementById('newQuestion');
 const newAnswer = document.getElementById('newAnswer');
 
+let deferredInstallPrompt = null;
+const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+
+function hideInstallButton() {
+  if (btnInstallPwa) {
+    btnInstallPwa.hidden = true;
+    btnInstallPwa.setAttribute('aria-hidden', 'true');
+    btnInstallPwa.disabled = false;
+  }
+}
+
+function showInstallButton() {
+  if (btnInstallPwa) {
+    btnInstallPwa.hidden = false;
+    btnInstallPwa.removeAttribute('aria-hidden');
+    btnInstallPwa.disabled = false;
+  }
+}
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', async () => {
+    try {
+      await navigator.serviceWorker.register('./sw.js');
+    } catch (err) {
+      console.error('Falha ao registrar service worker', err);
+    }
+  });
+}
+
+if (btnInstallPwa) {
+  if (isStandalone) {
+    hideInstallButton();
+  }
+
+  btnInstallPwa.addEventListener('click', async () => {
+    if (!deferredInstallPrompt) {
+      alert('Para instalar, utilize o menu do navegador e escolha "Adicionar à tela inicial".');
+      return;
+    }
+    btnInstallPwa.disabled = true;
+    try {
+      deferredInstallPrompt.prompt();
+      const { outcome } = await deferredInstallPrompt.userChoice;
+      if (outcome === 'accepted') {
+        hideInstallButton();
+      } else {
+        btnInstallPwa.disabled = false;
+      }
+    } finally {
+      deferredInstallPrompt = null;
+    }
+  });
+}
+
+window.addEventListener('beforeinstallprompt', (event) => {
+  event.preventDefault();
+  deferredInstallPrompt = event;
+  showInstallButton();
+});
+
+window.addEventListener('appinstalled', () => {
+  deferredInstallPrompt = null;
+  hideInstallButton();
+});
+
 if (btnGoToNew) {
   btnGoToNew.addEventListener('click', () => {
     if (!newQaCard) return;
