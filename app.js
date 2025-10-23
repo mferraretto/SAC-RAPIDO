@@ -20,8 +20,6 @@ const btnClear = document.getElementById('btnClear');
 const btnReload = document.getElementById('btnReload');
 const btnSeed = document.getElementById('btnSeed');
 const searchTools = document.getElementById('searchTools');
-const btnInstallPwa = document.getElementById('btnInstallPwa');
-const btnFocusNew = document.getElementById('btnFocusNew');
 
 const faqSection = document.getElementById('faqSection');
 const tipsSection = document.getElementById('tipsSection');
@@ -63,40 +61,7 @@ const posCardBullets = document.getElementById('posCardBullets');
 const posCardNote = document.getElementById('posCardNote');
 
 let currentUser = null;
-const POS_VENDAS_TAB_LABEL = 'Pós-vendas / Quebras';
-const TIPS_TAB_LABEL = 'Dicas e Recomendações';
-const SUMMARY_TAB_LABEL = 'Resumo';
-const ALL_CATEGORY_LABEL = 'Todos';
-const FALLBACK_CATEGORY_LABEL = 'Sem categoria';
-const FEATURED_CATEGORY_ORDER = [
-  'RECLAMAÇÕES ML',
-  'MEDIAÇÕES ML',
-  'FRETE E ENTREGA ML',
-  'REGRAS E DICAS ML',
-  'RECLAMAÇÕES SHOPEE',
-  'MEDIAÇÕES SHOPEE',
-  'FRETE E ENTREGA SHOPEE',
-  'REGRAS & DICAS SHOPEE',
-  'PRODUTOS E MEDIDAS'
-];
-const CATEGORY_THEME_MAP = new Map([
-  [ALL_CATEGORY_LABEL.toUpperCase(), 'theme-all'],
-  ['RECLAMAÇÕES ML', 'theme-ml-strong'],
-  ['MEDIAÇÕES ML', 'theme-ml-strong'],
-  ['FRETE E ENTREGA ML', 'theme-ml-soft'],
-  ['REGRAS E DICAS ML', 'theme-ml-soft'],
-  ['RECLAMAÇÕES SHOPEE', 'theme-shopee-strong'],
-  ['MEDIAÇÕES SHOPEE', 'theme-shopee-strong'],
-  ['FRETE E ENTREGA SHOPEE', 'theme-shopee-soft'],
-  ['REGRAS & DICAS SHOPEE', 'theme-shopee-soft'],
-  ['PRODUTOS E MEDIDAS', 'theme-neutral'],
-  [FALLBACK_CATEGORY_LABEL.toUpperCase(), 'theme-neutral'],
-  [POS_VENDAS_TAB_LABEL.toUpperCase(), 'theme-pos'],
-  [TIPS_TAB_LABEL.toUpperCase(), 'theme-tips'],
-  [SUMMARY_TAB_LABEL.toUpperCase(), 'theme-summary']
-]);
-
-let currentCategory = ALL_CATEGORY_LABEL;
+let currentCategory = 'Todas';
 let categories = new Set();
 let lastSnapshot = [];
 let posCards = [];
@@ -108,6 +73,9 @@ let posSeedEnsured = false;
 let draggingQaCard = null;
 let draggingPosCard = null;
 
+const POS_VENDAS_TAB_LABEL = 'Pós-vendas / Quebras';
+const TIPS_TAB_LABEL = 'Dicas e Recomendações';
+const SUMMARY_TAB_LABEL = 'Resumo';
 const DATE_TIME_FORMATTER = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
 const posVendasContent = {
   top: [
@@ -237,12 +205,7 @@ async function fetchAll() {
   const snap = await getDocs(col);
   const items = [];
   snap.forEach(d => items.push({ id: d.id, ...d.data() }));
-  const normalizedItems = items.map(item => {
-    const rawCategory = typeof item.category === 'string' ? item.category.trim() : '';
-    const category = rawCategory || FALLBACK_CATEGORY_LABEL;
-    return { ...item, category };
-  });
-  lastSnapshot = normalizedItems
+  lastSnapshot = items
     .map(item => ({ ...item, orderIndex: typeof item.orderIndex === 'number' ? item.orderIndex : Number.MAX_SAFE_INTEGER }))
     .sort((a, b) => {
       const orderDiff = (a.orderIndex ?? Number.MAX_SAFE_INTEGER) - (b.orderIndex ?? Number.MAX_SAFE_INTEGER);
@@ -251,7 +214,7 @@ async function fetchAll() {
       if (catDiff !== 0) return catDiff;
       return (a.question || '').localeCompare(b.question || '');
     });
-  categories = new Set(normalizedItems.map(i => i.category));
+  categories = new Set(items.map(i => i.category));
 }
 
 async function fetchPosCards() {
@@ -341,51 +304,16 @@ function toggleSearchTools(visible) {
 }
 
 function renderTabs() {
-  if (!tabsEl) return;
-
-  const normalizeKey = (label) => (label || '').trim().toUpperCase();
-  const availableCategories = Array.from(categories)
-    .map(cat => (typeof cat === 'string' ? cat.trim() : ''))
-    .filter(Boolean);
-
-  const normalizedMap = new Map();
-  availableCategories.forEach(cat => {
-    const key = normalizeKey(cat);
-    if (!normalizedMap.has(key)) {
-      normalizedMap.set(key, cat);
-    }
-  });
-
-  const preferred = FEATURED_CATEGORY_ORDER
-    .map(key => normalizedMap.get(key))
-    .filter(Boolean);
-
-  const usedKeys = new Set(preferred.map(cat => normalizeKey(cat)));
-  const remaining = Array.from(normalizedMap.values())
-    .filter(cat => !usedKeys.has(normalizeKey(cat)))
-    .sort((a, b) => a.localeCompare(b));
-
-  const tabOrder = [ALL_CATEGORY_LABEL, ...preferred, ...remaining];
-  const makeTab = (name) => {
-    const button = document.createElement('button');
-    button.type = 'button';
-    const themeClass = CATEGORY_THEME_MAP.get(normalizeKey(name)) || 'theme-generic';
-    button.className = `tab menu-chip ${themeClass}${name === currentCategory ? ' active' : ''}`;
-    button.textContent = name;
-    button.addEventListener('click', () => {
-      currentCategory = name;
-      renderList(searchInput?.value.trim() || '');
-    });
-    return button;
-  };
-
-  const availableTabs = new Set([...tabOrder, POS_VENDAS_TAB_LABEL, TIPS_TAB_LABEL, SUMMARY_TAB_LABEL]);
-  if (!availableTabs.has(currentCategory)) {
-    currentCategory = ALL_CATEGORY_LABEL;
-  }
-
   tabsEl.innerHTML = '';
-  tabOrder.forEach(name => tabsEl.appendChild(makeTab(name)));
+  const makeTab = (name) => {
+    const b = document.createElement('button');
+    b.className = 'tab' + (name === currentCategory ? ' active' : '');
+    b.textContent = name;
+    b.addEventListener('click', () => { currentCategory = name; renderList(searchInput.value.trim()); });
+    return b;
+  };
+  tabsEl.appendChild(makeTab('Todas'));
+  Array.from(categories).sort().forEach(cat => tabsEl.appendChild(makeTab(cat)));
   tabsEl.appendChild(makeTab(POS_VENDAS_TAB_LABEL));
   tabsEl.appendChild(makeTab(TIPS_TAB_LABEL));
   tabsEl.appendChild(makeTab(SUMMARY_TAB_LABEL));
@@ -401,12 +329,6 @@ function renderCatDatalist() {
 }
 
 function renderList(searchText='') {
-  if (btnNewQa) {
-    const showButton = currentCategory !== TIPS_TAB_LABEL && currentCategory !== SUMMARY_TAB_LABEL;
-    btnNewQa.style.display = showButton ? '' : 'none';
-    btnNewQa.disabled = showButton ? currentCategory === POS_VENDAS_TAB_LABEL : false;
-  }
-
   if (currentCategory === TIPS_TAB_LABEL) {
     showSection('tips');
     toggleSearchTools(false);
@@ -433,7 +355,7 @@ function renderList(searchText='') {
   }
 
   const filter = (item) => {
-    const byCat = (currentCategory === ALL_CATEGORY_LABEL || item.category === currentCategory);
+    const byCat = (currentCategory === 'Todas' || item.category === currentCategory);
     const bySearch = !searchText || (item.question.toLowerCase().includes(searchText.toLowerCase()) || item.answer.toLowerCase().includes(searchText.toLowerCase()));
     return byCat && bySearch;
   };
@@ -1133,14 +1055,6 @@ async function ensurePosSeed() {
 }
 
 // --- Actions ---
-btnNewQa?.addEventListener('click', () => {
-  if (!newQaCard) return;
-  newQaCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  if (newCategory) {
-    setTimeout(() => newCategory.focus(), 300);
-  }
-});
-
 btnReload.addEventListener('click', reload);
 btnClear.addEventListener('click', () => { searchInput.value=''; renderList(''); });
 searchInput.addEventListener('input', (e) => renderList(e.target.value.trim()));
