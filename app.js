@@ -12,6 +12,7 @@ const authSection = document.getElementById('authSection');
 const appSection = document.getElementById('appSection');
 const userEmailSpan = document.getElementById('userEmail');
 const btnLogout = document.getElementById('btnLogout');
+const btnInstall = document.getElementById('btnInstall');
 const tabsEl = document.getElementById('tabs');
 const qaListEl = document.getElementById('qaList');
 const catListDatalist = document.getElementById('catList');
@@ -37,6 +38,10 @@ const summaryTotalsEl = document.getElementById('summaryTotals');
 const summaryDateFrom = document.getElementById('summaryDateFrom');
 const summaryDateTo = document.getElementById('summaryDateTo');
 const summaryClearFilters = document.getElementById('summaryClearFilters');
+
+const offlineBanner = document.getElementById('offlineBanner');
+const updateBanner = document.getElementById('updateBanner');
+const btnRefresh = document.getElementById('btnRefresh');
 
 const newForm = document.getElementById('newForm');
 const newCategory = document.getElementById('newCategory');
@@ -72,6 +77,8 @@ let allTimeLogStats = new Map();
 let posSeedEnsured = false;
 let draggingQaCard = null;
 let draggingPosCard = null;
+let deferredInstallPrompt = null;
+let waitingServiceWorker = null;
 
 const POS_VENDAS_TAB_LABEL = 'Pós-vendas / Quebras';
 const TIPS_TAB_LABEL = 'Dicas e Recomendações';
@@ -150,6 +157,90 @@ const posVendasContent = {
       note: 'Assim você recebe rapidinho a peça nova, de forma prática e segura.'
     }
   ]
+};
+
+const updateConnectivityBanner = () => {
+  if (!offlineBanner) return;
+  offlineBanner.hidden = navigator.onLine;
+};
+
+updateConnectivityBanner();
+window.addEventListener('online', updateConnectivityBanner);
+window.addEventListener('offline', updateConnectivityBanner);
+
+if (btnInstall) {
+  btnInstall.addEventListener('click', async () => {
+    if (!deferredInstallPrompt) return;
+    deferredInstallPrompt.prompt();
+    await deferredInstallPrompt.userChoice;
+    deferredInstallPrompt = null;
+    btnInstall.hidden = true;
+  });
+}
+
+window.addEventListener('beforeinstallprompt', (event) => {
+  event.preventDefault();
+  deferredInstallPrompt = event;
+  if (btnInstall) {
+    btnInstall.hidden = false;
+  }
+});
+
+window.addEventListener('appinstalled', () => {
+  deferredInstallPrompt = null;
+  if (btnInstall) {
+    btnInstall.hidden = true;
+  }
+});
+
+const hideUpdateBanner = () => {
+  waitingServiceWorker = null;
+  if (updateBanner) {
+    updateBanner.hidden = true;
+  }
+  if (btnRefresh) {
+    btnRefresh.disabled = false;
+    btnRefresh.textContent = 'Atualizar agora';
+  }
+};
+
+const showUpdateBanner = (worker) => {
+  waitingServiceWorker = worker;
+  if (updateBanner) {
+    updateBanner.hidden = false;
+  }
+  if (btnRefresh) {
+    btnRefresh.disabled = false;
+    btnRefresh.textContent = 'Atualizar agora';
+  }
+};
+
+btnRefresh?.addEventListener('click', () => {
+  if (waitingServiceWorker) {
+    waitingServiceWorker.postMessage({ type: 'SKIP_WAITING' });
+    if (btnRefresh) {
+      btnRefresh.disabled = true;
+      btnRefresh.textContent = 'Atualizando...';
+    }
+  }
+});
+
+const listenForWaitingServiceWorker = (registration, callback) => {
+  if (!registration) return;
+  if (registration.waiting) {
+    callback(registration.waiting);
+    return;
+  }
+  const onUpdateFound = () => {
+    const installing = registration.installing;
+    if (!installing) return;
+    installing.addEventListener('statechange', () => {
+      if (installing.state === 'installed' && navigator.serviceWorker.controller) {
+        callback(registration.waiting || installing);
+      }
+    });
+  };
+  registration.addEventListener('updatefound', onUpdateFound);
 };
 
 // --- Auth ---
@@ -1221,4 +1312,26 @@ async function reload() {
   renderCatDatalist();
   renderTipCatDatalist();
   renderList(searchInput.value.trim());
+}
+
+if ('serviceWorker' in navigator) {
+  let hasReloadedForUpdate = false;
+
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js')
+      .then((registration) => {
+        listenForWaitingServiceWorker(registration, showUpdateBanner);
+      })
+      .catch((error) => {
+        console.error('Falha ao registrar o service worker', error);
+      });
+  });
+
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (hasReloadedForUpdate) return;
+    if (!waitingServiceWorker) return;
+    hasReloadedForUpdate = true;
+    hideUpdateBanner();
+    window.location.reload();
+  });
 }

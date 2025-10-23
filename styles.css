@@ -45,6 +45,56 @@ a { color: var(--primary); text-decoration: none; }
 }
 .auth-nav .btn { margin-left: 8px; }
 
+.banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 12px auto;
+  padding: 12px 16px;
+  max-width: 1100px;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  box-shadow: 0 12px 32px -24px rgba(15, 23, 42, 0.45);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.banner .material-symbols-rounded {
+  font-variation-settings: 'FILL' 1, 'wght' 500, 'GRAD' 0, 'opsz' 24;
+  font-size: 20px;
+}
+
+.banner-offline {
+  background: #fef2f2;
+  color: #b91c1c;
+  border-color: #fecaca;
+}
+
+.banner-update {
+  background: #eff6ff;
+  color: #1d4ed8;
+  border-color: #bfdbfe;
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+
+.btn-sm {
+  padding: 8px 12px;
+  font-size: 13px;
+  border-radius: 12px;
+}
+
+@media (max-width: 640px) {
+  .banner {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  .banner-update {
+    align-items: flex-start;
+  }
+}
+
 .card {
   background: var(--card);
   border:1px solid var(--border);

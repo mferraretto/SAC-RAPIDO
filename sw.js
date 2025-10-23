@@ -1,4 +1,4 @@
-const CACHE_NAME = 'sac-rapido-cache-v1';
+const CACHE_NAME = 'sac-rapido-cache-v2';
 const PRECACHE_URLS = [
   './',
   './index.html',
@@ -24,6 +24,13 @@ self.addEventListener('activate', (event) => {
       )
     )
   );
+  self.clients.claim();
+});
+
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
 });
 
 self.addEventListener('fetch', (event) => {
