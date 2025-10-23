@@ -1,0 +1,22 @@
+{
+  "name": "SAC – Central de Perguntas e Respostas",
+  "short_name": "SAC",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#f6f8fc",
+  "theme_color": "#0b5ed7",
+  "description": "Central colaborativa para perguntas, respostas e conteúdo de pós-venda.",
+  "lang": "pt-BR",
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
